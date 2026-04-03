@@ -4,4 +4,4 @@ This is just a small python script to convert Cubecobra cube data into a format 
 
 ## Example Output
 
-[doc/example.png](example)
+![Example](./doc/example.png)
