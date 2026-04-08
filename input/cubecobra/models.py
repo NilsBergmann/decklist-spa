@@ -24,29 +24,29 @@ class Image(BaseModel):
 
 
 class Owner(BaseModel):
-    patron: str
-    imageName: str
-    followedCubes: list[str]
-    defaultPrinting: str
-    dateLastUpdated: int
-    roles: list[str]
-    about: str
-    autoBlog: bool
-    usernameLower: str
-    followedUsers: list[str]
-    disableAnimations: bool
-    dateCreated: int
-    cubes: list[Any]
-    following: list[str]
-    useTextOverIcons: bool
-    hideTagColors: bool
-    theme: str
-    id: str
-    yourCubesSortOrder: str
-    username: str
-    hideFeatured: bool
-    gridTightness: str
-    image: Image
+    patron: str | None = None
+    imageName: str | None = None
+    followedCubes: list[str] | None = None
+    defaultPrinting: str | None = None
+    dateLastUpdated: int | None = None
+    roles: list[str] | None = None
+    about: str | None = None
+    autoBlog: bool | None = None
+    usernameLower: str | None = None
+    followedUsers: list[str] | None = None
+    disableAnimations: bool | None = None
+    dateCreated: int | None = None
+    cubes: list[Any] | None = None
+    following: list[str] | None = None
+    useTextOverIcons: bool | None = None
+    hideTagColors: bool | None = None
+    theme: str | None = None
+    id: str | None = None
+    yourCubesSortOrder: str | None = None
+    username: str | None = None
+    hideFeatured: bool | None = None
+    gridTightness: str | None = None
+    image: Image | None = None
 
 
 class TagColor(BaseModel):
@@ -136,7 +136,7 @@ class MainboardItem(BaseModel):
     cardID: str
     addedTmsp: int | str | None = None
     status: str
-    tags: list[str]
+    tags: list[str] = []
     markedForDelete: bool | None = None
     details: Details
     index: int
