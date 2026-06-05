@@ -1,0 +1,6 @@
+.venv
+__pycache__
+*.pyc
+*.cardconjurer
+../spa/sample-cube.json
+.git

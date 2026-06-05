@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decklist Generator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="controls">
+    <h1>Decklist Generator</h1>
+    <div class="form-group">
+      <label for="cubeId">Cube ID, slug, or URL</label>
+      <input id="cubeId" type="text" placeholder="eb930417-548a-4265-82c9-e661e6dfe87f" />
+    </div>
+    <div class="form-group" id="cacheGroup" style="display:none">
+      <label for="cacheSelect">Cached cubes</label>
+      <div class="cache-row">
+        <select id="cacheSelect"></select>
+        <button id="cacheLoadBtn" class="secondary">Load</button>
+        <button id="cacheDeleteBtn" class="danger">Remove</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="watermark">Watermark</label>
+      <select id="watermark">
+        <option value="none">None</option>
+        <option value="blb" selected>BLB — Bloomburrow</option>
+        <option value="tla">TLA — The Lost Caverns of Ixalan</option>
+        <option value="eoe">EOE</option>
+      </select>
+    </div>
+    <div class="actions">
+      <button id="generateBtn">Generate</button>
+      <button id="printBtn" class="secondary" style="display:none">Print / Save PDF</button>
+    </div>
+    <div id="status"></div>
+  </div>
+  <div id="cardGrid"></div>
+  <script src="app.js?v=2"></script>
+</body>
+</html>

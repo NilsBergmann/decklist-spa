@@ -1,0 +1,310 @@
+:root {
+  --card-w: 63mm;
+  --card-h: 88mm;
+}
+
+/* ── SCREEN LAYOUT ─────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #1e1e1e;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #e0e0e0;
+}
+
+#controls {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 28px 24px 20px;
+}
+
+h1 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 20px;
+  color: #f0f0f0;
+}
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  color: #aaa;
+  margin-bottom: 5px;
+}
+
+input[type="text"],
+select {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: #2d2d2d;
+  color: #e8e8e8;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+input[type="text"]:focus,
+select:focus {
+  border-color: #5b9cf6;
+}
+
+select option { background: #2d2d2d; }
+
+.actions {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+button {
+  padding: 9px 22px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  background: #3b82f6;
+  color: #fff;
+  transition: background 0.15s;
+}
+
+button:hover  { background: #2563eb; }
+button:active { background: #1d4ed8; }
+
+button.secondary             { background: #404040; }
+button.secondary:hover       { background: #525252; }
+button.secondary:active      { background: #5e5e5e; }
+
+button.danger                { background: #7f1d1d; }
+button.danger:hover          { background: #991b1b; }
+button.danger:active         { background: #b91c1c; }
+
+.cache-row {
+  display: flex;
+  gap: 8px;
+}
+
+.cache-row select {
+  flex: 1;
+}
+
+#status {
+  margin-top: 12px;
+  font-size: 13px;
+  min-height: 18px;
+  line-height: 1.4;
+}
+#status.error   { color: #f87171; }
+#status.loading { color: #60a5fa; }
+
+#cardGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5mm;
+  padding: 4px 24px 32px;
+  justify-content: center;
+}
+
+/* ── CARD FRAME ────────────────────────────────────────── */
+
+.card {
+  width: var(--card-w);
+  height: var(--card-h);
+  /* Dark outer frame — looks like card edge */
+  background: #0d0d0d;
+  border-radius: 3.5mm;
+  padding: 2mm 1.8mm 2mm 1.8mm;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.6);
+}
+
+.card-inner {
+  flex: 1;
+  border-radius: 2.5mm;
+  /* Frame color set inline via --frame-a / --frame-b */
+  background: linear-gradient(
+    to right,
+    var(--frame-a, #5e9e5e) 50%,
+    var(--frame-b, var(--frame-a, #5e9e5e)) 50%
+  );
+  padding: 1.2mm 1.3mm;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9mm;
+  overflow: hidden;
+}
+
+/* ── TITLE BOX ─────────────────────────────────────────── */
+
+.card-title {
+  background: #f3edd8;
+  border-radius: 1.5mm;
+  padding: 0.8mm 2mm;
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  font-weight: bold;
+  font-size: 3.8mm;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+  color: #111;
+}
+
+/* ── BODY BOX ──────────────────────────────────────────── */
+
+.card-body {
+  background: #f3edd8;
+  border-radius: 1.5mm;
+  flex: 1;
+  padding: 1.6mm 1.8mm;
+  overflow: hidden;
+  position: relative;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 2.7mm;
+  line-height: 1.35;
+  color: #111;
+}
+
+.card-wm {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.card-wm img {
+  width: 55%;
+  height: 55%;
+  object-fit: contain;
+  opacity: 0.13;
+}
+
+.card-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── CARD LIST ─────────────────────────────────────────── */
+
+.type-header {
+  font-weight: bold;
+  margin-top: 0.5mm;
+  line-height: 1.3;
+}
+
+.type-header:first-child {
+  margin-top: 0;
+}
+
+.card-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7mm;
+  padding-left: 0.8mm;
+  line-height: 1.3;
+  min-width: 0;
+}
+
+.row-count {
+  min-width: 3.8mm;
+  font-size: 2.4mm;
+  color: #444;
+  flex-shrink: 0;
+}
+
+.row-diamond {
+  font-size: 2.2mm;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.row-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25mm;
+  flex-shrink: 0;
+  margin-left: 0.5mm;
+}
+
+/* ── MANA SYMBOLS ──────────────────────────────────────── */
+
+.ms {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.1mm;
+  height: 3.1mm;
+  border-radius: 50%;
+  font-size: 1.85mm;
+  font-weight: bold;
+  border: 0.25mm solid rgba(0,0,0,0.3);
+  vertical-align: middle;
+  font-family: Arial, Helvetica, sans-serif;
+  flex-shrink: 0;
+}
+
+.ms-w { background: #f5f0d0; color: #5a4800; border-color: rgba(0,0,0,0.2); }
+.ms-u { background: #1168a7; color: #fff; }
+.ms-b { background: #221810; color: #ccc; }
+.ms-r { background: #c83020; color: #fff; }
+.ms-g { background: #006832; color: #fff; }
+.ms-c { background: #c8c8cc; color: #333; }
+.ms-m { background: #c89400; color: #fff; }
+.ms-s { background: #aacccc; color: #333; }   /* snow */
+.ms-x, .ms-y, .ms-z { background: #aaa; color: #222; }
+/* generic / numeric */
+.ms-n { background: #b8b8b8; color: #222; }
+
+/* ── PRINT LAYOUT ──────────────────────────────────────── */
+
+@media print {
+  body  { background: white; }
+
+  #controls { display: none !important; }
+
+  #cardGrid {
+    display: grid;
+    grid-template-columns: repeat(3, var(--card-w));
+    grid-auto-rows: var(--card-h);
+    gap: 2mm;
+    padding: 4mm;
+    justify-content: center;
+    width: auto;
+  }
+
+  .card {
+    box-shadow: none;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Force page break before every 10th card (= start of 2nd page, 3rd…) */
+  .card:nth-child(9n + 1):not(:first-child) {
+    break-before: page;
+    page-break-before: always;
+  }
+}

@@ -5,12 +5,12 @@ from output.cardconjurer.cardconjurer import printDecks
 from input.cubecobra.cubecobra import convertCubeDataToDeck
 
 
-# cubeID = "blb-tight"
-# watermark = "blb"
+cubeID = "eb930417-548a-4265-82c9-e661e6dfe87f"
+watermark = "blb"
 # cubeID = "eoe-tight"
 # watermark = "eoe"
-cubeID = "tla-tle-tight"
-watermark = "tla"
+# cubeID = "tla-tle-tight"
+# watermark = "tla"
 data = getCubeData(cubeID)
 print(data)
 
