@@ -215,9 +215,15 @@ async function openFullscreen(index) {
 
 // ── EDIT MODAL ────────────────────────────────────────────────────────────────
 
-const editModal    = document.getElementById('editModal');
-const editTextarea = document.getElementById('editTextarea');
+const editModal          = document.getElementById('editModal');
+const editTextarea       = document.getElementById('editTextarea');
+const editSubtitleGroup  = document.getElementById('editSubtitleGroup');
+const editSubtitleInput  = document.getElementById('editSubtitle');
+const editArtUrlGroup    = document.getElementById('editArtUrlGroup');
+const editArtUrlInput    = document.getElementById('editArtUrl');
 let   editingIndex = -1;
+
+const MODAL_ART_STYLES = new Set(['art-bg', 'cover']);
 
 document.getElementById('editClose').addEventListener('click',    () => { editModal.style.display = 'none'; });
 document.getElementById('editCancelBtn').addEventListener('click', () => { editModal.style.display = 'none'; });
@@ -230,7 +236,22 @@ document.getElementById('editSaveBtn').addEventListener('click', async () => {
   const parsed = parseManualDeck(text);
   if (!parsed.length) { alert('No cards found — check the format.'); return; }
 
-  updateState(editingIndex, { deck: parsed[0] });
+  const deck      = parsed[0];
+  const entry     = getState(editingIndex);
+  const styleKey  = entry?.styleKey ?? 'm15';
+
+  // Merge subtitle back into deck name (cover style only)
+  if (styleKey === 'cover') {
+    const subtitle = editSubtitleInput.value.trim();
+    const baseTitle = deck.name.split('|')[0].trim();
+    deck.name = subtitle ? `${baseTitle} | ${subtitle}` : baseTitle;
+  }
+
+  const patch = { deck };
+  if (MODAL_ART_STYLES.has(styleKey)) {
+    patch.artOverride = editArtUrlInput.value.trim();
+  }
+  updateState(editingIndex, patch);
 
   const saveBtn = document.getElementById('editSaveBtn');
   saveBtn.disabled = true;
@@ -249,6 +270,22 @@ document.getElementById('editSaveBtn').addEventListener('click', async () => {
 function openEdit(index) {
   const entry = getState(index);
   if (!entry) return;
+
+  const styleKey = entry.styleKey ?? 'm15';
+
+  // Subtitle: cover only — extract from the "Title | Subtitle" deck name
+  const isCover = styleKey === 'cover';
+  editSubtitleGroup.style.display = isCover ? '' : 'none';
+  if (isCover) {
+    const parts = (entry.deck.name ?? '').split('|');
+    editSubtitleInput.value = parts.slice(1).join('|').trim();
+  }
+
+  // Art URL: art-bg and cover
+  const hasArt = MODAL_ART_STYLES.has(styleKey);
+  editArtUrlGroup.style.display = hasArt ? '' : 'none';
+  if (hasArt) editArtUrlInput.value = entry.artOverride ?? '';
+
   editTextarea.value = deckToManualText(entry.deck);
   editingIndex = index;
   editModal.style.display = 'flex';

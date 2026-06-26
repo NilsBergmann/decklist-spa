@@ -413,6 +413,27 @@ button.danger:active         { background: #b91c1c; }
   border-top: 1px solid #383838;
 }
 
+.modal-field {
+  padding: 10px 18px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.modal-field label {
+  font-size: 12px;
+  color: #aaa;
+}
+.modal-field input {
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 5px;
+  color: #eee;
+  font-size: 13px;
+  padding: 6px 10px;
+  outline: none;
+}
+.modal-field input:focus { border-color: #666; }
+
 /* ── PRINT LAYOUT (A2 + A3) ─────────────────────────────── */
 
 /* Default @page is A4; JavaScript injects an override for Letter. */

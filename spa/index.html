@@ -102,6 +102,15 @@
         <span class="modal-title">Edit deck</span>
         <button class="modal-close-sm" id="editClose" title="Close">✕</button>
       </div>
+      <!-- Per-card fields: shown only for styles that use them -->
+      <div id="editSubtitleGroup" class="modal-field" style="display:none">
+        <label for="editSubtitle">Subtitle</label>
+        <input id="editSubtitle" type="text" placeholder="Tagline shown below the title">
+      </div>
+      <div id="editArtUrlGroup" class="modal-field" style="display:none">
+        <label for="editArtUrl">Art URL</label>
+        <input id="editArtUrl" type="text" placeholder="https://… — blank = auto">
+      </div>
       <textarea id="editTextarea" spellcheck="false"></textarea>
       <div class="modal-footer">
         <button id="editSaveBtn">Re-render</button>
@@ -110,6 +119,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/main.js?v=29"></script>
+  <script type="module" src="js/main.js?v=31"></script>
 </body>
 </html>
