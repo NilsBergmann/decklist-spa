@@ -9,34 +9,107 @@
 <body>
   <div id="controls">
     <h1>Decklist Generator</h1>
-    <div class="form-group">
-      <label for="cubeId">Cube ID, slug, or URL</label>
-      <input id="cubeId" type="text" placeholder="eb930417-548a-4265-82c9-e661e6dfe87f" />
+
+    <!-- B2: Input-mode tabs -->
+    <div class="tabs">
+      <button class="tab active" data-mode="cubecobra">Cubecobra</button>
+      <button class="tab"        data-mode="manual">Manual</button>
     </div>
-    <div class="form-group" id="cacheGroup" style="display:none">
-      <label for="cacheSelect">Cached cubes</label>
-      <div class="cache-row">
-        <select id="cacheSelect"></select>
-        <button id="cacheLoadBtn" class="secondary">Load</button>
-        <button id="cacheDeleteBtn" class="danger">Remove</button>
+
+    <!-- Cubecobra mode -->
+    <div id="modeCubecobra" class="mode-panel">
+      <div class="form-group">
+        <label for="cubeId">Cube ID, slug, or URL</label>
+        <input id="cubeId" type="text" placeholder="eb930417-548a-4265-82c9-e661e6dfe87f" />
+      </div>
+      <div class="form-group" id="cacheGroup" style="display:none">
+        <label for="cacheSelect">Cached cubes</label>
+        <div class="cache-row">
+          <select id="cacheSelect"></select>
+          <button id="cacheLoadBtn" class="secondary">Load</button>
+          <button id="cacheDeleteBtn" class="danger">Remove</button>
+        </div>
       </div>
     </div>
+
+    <!-- B2: Manual mode -->
+    <div id="modeManual" class="mode-panel" style="display:none">
+      <div class="form-group">
+        <label for="manualText">Deck list</label>
+        <textarea id="manualText" placeholder="# Deck Name&#10;Creature&#10;4 Llanowar Elves {g}&#10;1 Wrath of God {2}{w}{w} (rare)&#10;Land&#10;6 Forest"></textarea>
+      </div>
+    </div>
+
+    <!-- Shared controls -->
+    <!-- B3: Render style -->
+    <div class="form-group">
+      <label for="styleSelect">Style</label>
+      <select id="styleSelect"></select>
+    </div>
+
+    <!-- B3: Art-background source (shown only for the art style) -->
+    <div class="form-group" id="artUrlGroup" style="display:none">
+      <label for="artUrl">Background image URL (optional)</label>
+      <input id="artUrl" type="text" placeholder="https://… — blank = each deck's top card art" />
+    </div>
+
     <div class="form-group">
       <label for="watermark">Watermark</label>
-      <select id="watermark">
-        <option value="none">None</option>
-        <option value="blb" selected>BLB — Bloomburrow</option>
-        <option value="tla">TLA — The Lost Caverns of Ixalan</option>
-        <option value="eoe">EOE</option>
+      <select id="watermark"></select>
+    </div>
+
+    <!-- A2: Page size -->
+    <div class="form-group">
+      <label for="pageSize">Page size</label>
+      <select id="pageSize">
+        <option value="a4">A4</option>
+        <option value="letter">US Letter</option>
       </select>
     </div>
+
+    <!-- A3: Crop marks toggle -->
+    <div class="inline-check">
+      <label>
+        <input type="checkbox" id="cropMarks" checked>
+        Crop marks
+      </label>
+    </div>
+
     <div class="actions">
       <button id="generateBtn">Generate</button>
-      <button id="printBtn" class="secondary" style="display:none">Print / Save PDF</button>
+      <button id="printBtn"    class="secondary" style="display:none">Print / Save PDF</button>
+      <button id="downloadBtn" class="secondary" style="display:none">Download PNGs</button>
+      <!-- D1: deck YAML import / export -->
+      <button id="importYamlBtn" class="secondary">Import YAML</button>
+      <button id="exportYamlBtn" class="secondary" style="display:none">Export YAML</button>
+      <input id="importYamlInput" type="file" accept=".yaml,.yml,.txt" style="display:none">
     </div>
     <div id="status"></div>
   </div>
+
   <div id="cardGrid"></div>
-  <script src="app.js?v=2"></script>
+
+  <!-- Fullscreen lightbox -->
+  <div id="fullscreenModal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true">
+    <button class="modal-close" id="fullscreenClose" title="Close">✕</button>
+    <canvas id="fullscreenCanvas"></canvas>
+  </div>
+
+  <!-- Edit modal -->
+  <div id="editModal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title">Edit deck</span>
+        <button class="modal-close-sm" id="editClose" title="Close">✕</button>
+      </div>
+      <textarea id="editTextarea" spellcheck="false"></textarea>
+      <div class="modal-footer">
+        <button id="editSaveBtn">Re-render</button>
+        <button id="editCancelBtn" class="secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js?v=28"></script>
 </body>
 </html>
