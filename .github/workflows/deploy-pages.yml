@@ -5,7 +5,7 @@ name: Deploy SPA to GitHub Pages
 
 on:
   push:
-    branches: [master]
+    branches: [main, master]
     paths:
       - 'spa/**'
       - '.github/workflows/deploy-pages.yml'

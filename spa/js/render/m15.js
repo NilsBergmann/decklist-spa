@@ -97,7 +97,8 @@ async function drawWatermark(ctx, card, model) {
   const { source, leftHex, rightHex } = model.watermark;
   if (!source) return;
 
-  const wm = await loadImage(source);
+  let wm;
+  try { wm = await loadImage(source); } catch { return; }
   const w  = card.width, h = card.height;
   const bounds = WATERMARK_BOUNDS;
 
@@ -145,7 +146,7 @@ const m15 = {
       loadImage(frameSrc(model.primaryColor)),
       loadImage(frameSrc(model.secondaryColor)),
     ];
-    if (model.watermark.source) loads.push(loadImage(model.watermark.source));
+    if (model.watermark.source) loads.push(loadImage(model.watermark.source).catch(() => null));
     const pipCodes = model.colorIdentity.map(c => c.toLowerCase());
     for (const code of [...model.manaCodes, ...pipCodes]) {
       if (MANA_CODES.has(code.toLowerCase())) loads.push(loadImage(manaSrc(code)));
