@@ -60,7 +60,7 @@ export async function renderOneCell(index) {
   const entry = getState(index);
   if (!entry) return;
   const artOverride = await resolveArtUrl(entry.artOverride ?? '');
-  const model = buildDeckModel(entry.deck, entry.wmKey, artOverride);
+  const model = buildDeckModel(entry.deck, entry.wmKey, artOverride, { colorOverride: entry.colorOverride });
   updateState(index, { model });
   const tmp = await renderFullRes(index);
   if (!tmp) return;
@@ -102,7 +102,7 @@ export async function renderDecks(decks, wmKey, styleKey = 'm15', artOverride = 
     screenC.className = 'card card--screen';
     cell.appendChild(screenC);
 
-    pushState({ deck, wmKey, styleKey, artOverride, model: null, cell });
+    pushState({ deck, wmKey, styleKey, artOverride, colorOverride: null, model: null, cell });
     addCardOverlay(cell, i);
     return cell;
   });
@@ -111,7 +111,7 @@ export async function renderDecks(decks, wmKey, styleKey = 'm15', artOverride = 
   // Render all cards concurrently, each into a throwaway full-res canvas.
   await Promise.all(decks.map(async (deck, i) => {
     const resolvedArt = await resolveArtUrl(artOverride);
-    updateState(i, { model: buildDeckModel(deck, wmKey, resolvedArt) });
+    updateState(i, { model: buildDeckModel(deck, wmKey, resolvedArt, { colorOverride: getState(i)?.colorOverride }) });
     const tmp = await renderFullRes(i);
     if (!tmp) return;
     downsample(tmp, cells[i].querySelector('.card--screen'));
@@ -264,9 +264,50 @@ const artPickerSearch     = document.getElementById('artPickerSearch');
 const artPickerSearchGrid = document.getElementById('artPickerSearchGrid');
 const artPickerSearchStatus = document.getElementById('artPickerSearchStatus');
 const editPreviewCanvas   = document.getElementById('editPreviewCanvas');
+const editColorToggles    = document.getElementById('editColorToggles');
 let   editingIndex = -1;
 
 const MODAL_ART_STYLES = new Set(['art-bg', 'cover']);
+
+// ── COLOR OVERRIDE (edit modal) ───────────────────────────────────────────────
+// Modal-local working copy of the per-card colorOverride: null = auto, otherwise
+// an array of letters from W/U/B/R/G (or ['C'] for colorless). Seeded in
+// openEdit, mutated by the toggle buttons, persisted on save.
+let editColorOverride = null;
+
+// Sync the toggle buttons' pressed state to editColorOverride.
+function syncColorToggles() {
+  const active = new Set(editColorOverride ?? []);
+  for (const btn of editColorToggles.querySelectorAll('.color-toggle')) {
+    const on = btn.dataset.color === 'auto'
+      ? editColorOverride === null
+      : active.has(btn.dataset.color);
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', String(on));
+  }
+}
+
+// Toggle one color letter (or reset to auto). 'C' is mutually exclusive with the
+// WUBRG letters. Selecting nothing collapses back to auto (null).
+function toggleColor(color) {
+  if (color === 'auto') { editColorOverride = null; return; }
+  let cur = editColorOverride ? [...editColorOverride] : [];
+  if (color === 'C') {
+    cur = cur.includes('C') ? [] : ['C'];
+  } else {
+    cur = cur.filter(c => c !== 'C');
+    cur = cur.includes(color) ? cur.filter(c => c !== color) : [...cur, color];
+  }
+  editColorOverride = cur.length ? cur : null;
+}
+
+editColorToggles.addEventListener('click', e => {
+  const btn = e.target.closest('.color-toggle');
+  if (!btn) return;
+  toggleColor(btn.dataset.color);
+  syncColorToggles();
+  scheduleCardPreview();
+});
 
 function closeEdit() {
   if (editModal.style.display === 'none') return;
@@ -468,7 +509,7 @@ async function buildPreviewModel() {
     artOverride = await resolveArtUrl(editArtUrlInput.value.trim());
   }
 
-  return { model: buildDeckModel(deck, entry.wmKey, artOverride), styleKey };
+  return { model: buildDeckModel(deck, entry.wmKey, artOverride, { colorOverride: editColorOverride }), styleKey };
 }
 
 async function renderCardPreview() {
@@ -530,7 +571,7 @@ document.getElementById('editSaveBtn').addEventListener('click', async () => {
     deck.name = subtitle ? `${baseTitle} | ${subtitle}` : baseTitle;
   }
 
-  const patch = { deck };
+  const patch = { deck, colorOverride: editColorOverride };
   if (MODAL_ART_STYLES.has(styleKey)) {
     patch.artOverride = editArtUrlInput.value.trim();
   }
@@ -582,6 +623,12 @@ function openEdit(index) {
     populateDeckArtGrid(entry.deck);
     resolveArtUrl(artVal).then(setArtPreview);
   }
+
+  // Color override: applies to every style (drives pips/gradients/frame).
+  editColorOverride = Array.isArray(entry.colorOverride) && entry.colorOverride.length
+    ? [...entry.colorOverride]
+    : null;
+  syncColorToggles();
 
   editTextarea.value = deckToManualText(entry.deck);
   editingIndex = index;
