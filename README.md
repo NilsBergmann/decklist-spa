@@ -1,5 +1,11 @@
 # Decklist Generator
 
+> ⚠️ **Disclaimer — this project is "vibe coded" as an experiment.** It was
+> built largely by prompting an AI coding assistant, with minimal hand review,
+> to see how far that approach goes. It is **not** intended to be a reference or
+> example of good code, architecture, or practice — do not use it as one. Treat
+> everything here as throwaway experimentation and use it with that in mind.
+
 A browser app that turns a Magic: The Gathering cube or deck list into
 print-ready "deck cards" — single cards that summarise a whole deck's contents,
 handy as dividers or pack fronts. It runs entirely client-side; there is no
@@ -30,10 +36,10 @@ Live: https://nilsbergmann.github.io/decklist-spa/
 
 ## Running locally
 
-Served via Docker (static file server over the `spa/` folder):
+Served via Docker (a static file server over the repo root):
 
 ```sh
-docker compose -f spa/compose.yaml up -d
+docker compose up -d
 ```
 
 Then open http://localhost:8787. The folder is volume-mounted, so edits are
@@ -42,24 +48,24 @@ live on reload — no rebuild.
 ## Deployment
 
 Pushing to `main` (or `master`) triggers the GitHub Actions workflow in
-`.github/workflows/deploy-pages.yml`, which publishes `spa/` to GitHub Pages.
+`.github/workflows/deploy-pages.yml`, which publishes the site to GitHub Pages.
 
 ## Layout
 
 ```
-spa/
-  index.html        # app shell + modals
-  style.css
-  js/
-    main.js         # entry point: wires the control panel
-    cube-source.js  # Cubecobra fetch/cache, manual + YAML parsing, Scryfall art
-    deck-model.js   # style-agnostic deck model consumed by all renderers
-    cards-ui.js     # card cells, overlays, edit modal, live preview, download
-    state.js        # active card state
-    watermarks.js   # watermark/set definitions + resolution
-    config.js       # shared constants
-    render/
-      registry.js   # self-registering renderer registry
-      m15.js  art-bg.js  cover.js   # the three render styles
-      pips.js  text.js  assets.js  canvas-util.js
+index.html          # app shell + modals
+style.css
+compose.yaml        # local static-server container
+js/
+  main.js           # entry point: wires the control panel
+  cube-source.js    # Cubecobra fetch/cache, manual + YAML parsing, Scryfall art
+  deck-model.js     # style-agnostic deck model consumed by all renderers
+  cards-ui.js       # card cells, overlays, edit modal, live preview, download
+  state.js          # active card state
+  watermarks.js     # watermark/set definitions + resolution
+  config.js         # shared constants
+  render/
+    registry.js     # self-registering renderer registry
+    m15.js  art-bg.js  cover.js   # the three render styles
+    markup.js  pips.js  text.js  assets.js  canvas-util.js
 ```
