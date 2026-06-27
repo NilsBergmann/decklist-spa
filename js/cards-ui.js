@@ -234,6 +234,7 @@ const artPickerSearchPane = document.getElementById('artPickerSearchPane');
 const artPickerGrid       = document.getElementById('artPickerGrid');
 const artPickerSearch     = document.getElementById('artPickerSearch');
 const artPickerSearchGrid = document.getElementById('artPickerSearchGrid');
+const artPickerSearchStatus = document.getElementById('artPickerSearchStatus');
 const editPreviewCanvas   = document.getElementById('editPreviewCanvas');
 let   editingIndex = -1;
 
@@ -310,35 +311,53 @@ document.querySelectorAll('.art-picker-tab').forEach(tab => {
     const pane = tab.dataset.pickerTab;
     artPickerDeckPane.style.display   = pane === 'deck'   ? '' : 'none';
     artPickerSearchPane.style.display = pane === 'search' ? '' : 'none';
+    // Show the search hint the first time the Search tab is opened with no query.
+    if (pane === 'search' && !artPickerSearchGrid.childElementCount && !artPickerSearchStatus.textContent) {
+      artPickerSearchStatus.textContent = 'Type a card name to search Scryfall.';
+    }
   });
 });
 
-// Scryfall search with debounce. A monotonic sequence id guards against a slow
-// earlier request resolving after a newer one and overwriting fresher results.
+// Scryfall search. A monotonic sequence id guards against a slow earlier
+// request resolving after a newer one and overwriting fresher results.
 let _searchTimer = null;
 let _searchSeq   = 0;
+
+async function runArtSearch(q) {
+  const seq = ++_searchSeq;                 // invalidate any in-flight request
+  if (!q) {
+    artPickerSearchGrid.innerHTML = '';
+    artPickerSearchStatus.textContent = 'Type a card name to search Scryfall.';
+    return;
+  }
+  if (q.length < 2) {
+    artPickerSearchGrid.innerHTML = '';
+    artPickerSearchStatus.textContent = 'Type at least 2 characters.';
+    return;
+  }
+  artPickerSearchStatus.textContent = 'Searching…';
+  artPickerSearchGrid.innerHTML = '';
+  const results = await searchScryfallArt(q);
+  if (seq !== _searchSeq) return;           // a newer search superseded this one
+  if (!results.length) {
+    artPickerSearchStatus.textContent = `No results for “${q}”.`;
+    return;
+  }
+  artPickerSearchStatus.textContent =
+    `${results.length} result${results.length !== 1 ? 's' : ''}`;
+  const currentArt = editArtUrlInput.value.trim();
+  for (const { artUrl, name } of results) {
+    artPickerSearchGrid.appendChild(buildArtThumb(artUrl, name, artUrl === currentArt));
+  }
+}
+
 artPickerSearch.addEventListener('input', () => {
   clearTimeout(_searchTimer);
-  const q = artPickerSearch.value.trim();
-  const seq = ++_searchSeq;                 // invalidate any in-flight request
-  if (!q) { artPickerSearchGrid.innerHTML = ''; return; }
-  artPickerSearchGrid.innerHTML = '<div class="art-picker-loading">Searching…</div>';
-  _searchTimer = setTimeout(async () => {
-    const results = await searchScryfallArt(q);
-    if (seq !== _searchSeq) return;         // a newer search superseded this one
-    artPickerSearchGrid.innerHTML = '';
-    if (!results.length) {
-      const msg = document.createElement('div');
-      msg.className = 'art-picker-empty';
-      msg.textContent = 'No results';
-      artPickerSearchGrid.appendChild(msg);
-      return;
-    }
-    const currentArt = editArtUrlInput.value.trim();
-    for (const { artUrl, name } of results) {
-      artPickerSearchGrid.appendChild(buildArtThumb(artUrl, name, artUrl === currentArt));
-    }
-  }, 400);
+  _searchTimer = setTimeout(() => runArtSearch(artPickerSearch.value.trim()), 400);
+});
+// Enter searches immediately (skips the debounce).
+artPickerSearch.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); clearTimeout(_searchTimer); runArtSearch(artPickerSearch.value.trim()); }
 });
 
 // Reset art to automatic: clear the override, preview, and any selected thumb.
@@ -497,6 +516,7 @@ function openEdit(index) {
     artPickerSearchPane.style.display = 'none';
     artPickerSearch.value = '';
     artPickerSearchGrid.innerHTML = '';
+    artPickerSearchStatus.textContent = '';
     populateDeckArtGrid(entry.deck);
     resolveArtUrl(artVal).then(setArtPreview);
   }
