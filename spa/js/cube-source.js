@@ -343,3 +343,34 @@ export function parseDeckYaml(text) {
   flush();
   return decks.filter(d => d.cards.length > 0);
 }
+
+// ── SCRYFALL ART URL RESOLUTION ───────────────────────────────────────────────
+// If `input` is a Scryfall card page URL (scryfall.com/card/{set}/{num}[/…]),
+// fetch the card via the API and return the art_crop image URL.
+// Any other URL (or plain image URL) is returned unchanged.
+// Results are cached so repeated renders don't repeat the fetch.
+
+const _artResolveCache = new Map();
+
+export async function resolveArtUrl(input) {
+  if (!input) return '';
+  const url = input.trim();
+  if (_artResolveCache.has(url)) return _artResolveCache.get(url);
+
+  const m = url.match(/^https?:\/\/scryfall\.com\/card\/([^\/\?#]+)\/([^\/\?#]+)/);
+  if (m) {
+    try {
+      const r = await fetch(`https://api.scryfall.com/cards/${m[1]}/${m[2]}`);
+      if (r.ok) {
+        const d = await r.json();
+        const uris = d.image_uris ?? d.card_faces?.[0]?.image_uris;
+        const resolved = uris?.art_crop ?? url;
+        _artResolveCache.set(url, resolved);
+        return resolved;
+      }
+    } catch { /* network error — fall through */ }
+  }
+
+  _artResolveCache.set(url, url);
+  return url;
+}

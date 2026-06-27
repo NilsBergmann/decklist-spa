@@ -5,7 +5,7 @@
 import { get as registryGet }  from './render/registry.js';
 import { buildDeckModel }      from './deck-model.js';
 import { WATERMARKS }          from './watermarks.js';
-import { parseManualDeck, deckToManualText, decksToYaml } from './cube-source.js';
+import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl } from './cube-source.js?v=31';
 import {
   clear as clearState, push as pushState,
   get as getState, update as updateState, getAll as getAllState,
@@ -54,7 +54,8 @@ async function renderFullRes(index) {
 export async function renderOneCell(index) {
   const entry = getState(index);
   if (!entry) return;
-  const model = buildDeckModel(entry.deck, entry.wmKey, entry.artOverride);
+  const artOverride = await resolveArtUrl(entry.artOverride ?? '');
+  const model = buildDeckModel(entry.deck, entry.wmKey, artOverride);
   updateState(index, { model });
   const tmp = await renderFullRes(index);
   if (!tmp) return;
@@ -104,7 +105,8 @@ export async function renderDecks(decks, wmKey, styleKey = 'm15', artOverride = 
 
   // Render all cards concurrently, each into a throwaway full-res canvas.
   await Promise.all(decks.map(async (deck, i) => {
-    updateState(i, { model: buildDeckModel(deck, wmKey, artOverride) });
+    const resolvedArt = await resolveArtUrl(artOverride);
+    updateState(i, { model: buildDeckModel(deck, wmKey, resolvedArt) });
     const tmp = await renderFullRes(i);
     if (!tmp) return;
     downsample(tmp, cells[i].querySelector('.card--screen'));
