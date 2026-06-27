@@ -60,7 +60,7 @@ export async function renderOneCell(index) {
   const entry = getState(index);
   if (!entry) return;
   const artOverride = await resolveArtUrl(entry.artOverride ?? '');
-  const model = buildDeckModel(entry.deck, entry.wmKey, artOverride);
+  const model = buildDeckModel(entry.deck, entry.wmKey, artOverride, { blendRatio: entry.blendRatio });
   updateState(index, { model });
   const tmp = await renderFullRes(index);
   if (!tmp) return;
@@ -102,7 +102,7 @@ export async function renderDecks(decks, wmKey, styleKey = 'm15', artOverride = 
     screenC.className = 'card card--screen';
     cell.appendChild(screenC);
 
-    pushState({ deck, wmKey, styleKey, artOverride, model: null, cell });
+    pushState({ deck, wmKey, styleKey, artOverride, blendRatio: null, model: null, cell });
     addCardOverlay(cell, i);
     return cell;
   });
@@ -111,7 +111,8 @@ export async function renderDecks(decks, wmKey, styleKey = 'm15', artOverride = 
   // Render all cards concurrently, each into a throwaway full-res canvas.
   await Promise.all(decks.map(async (deck, i) => {
     const resolvedArt = await resolveArtUrl(artOverride);
-    updateState(i, { model: buildDeckModel(deck, wmKey, resolvedArt) });
+    const entry = getState(i);
+    updateState(i, { model: buildDeckModel(deck, wmKey, resolvedArt, { blendRatio: entry?.blendRatio }) });
     const tmp = await renderFullRes(i);
     if (!tmp) return;
     downsample(tmp, cells[i].querySelector('.card--screen'));
@@ -264,9 +265,32 @@ const artPickerSearch     = document.getElementById('artPickerSearch');
 const artPickerSearchGrid = document.getElementById('artPickerSearchGrid');
 const artPickerSearchStatus = document.getElementById('artPickerSearchStatus');
 const editPreviewCanvas   = document.getElementById('editPreviewCanvas');
+const editBlendGroup      = document.getElementById('editBlendGroup');
+const editBlendSlider     = document.getElementById('editBlendSlider');
+const editBlendValue      = document.getElementById('editBlendValue');
 let   editingIndex = -1;
 
 const MODAL_ART_STYLES = new Set(['art-bg', 'cover']);
+
+// Styles where the two-color blend slider is meaningful (m15 frame/watermark
+// split is the primary effect of splitRatio).
+const MODAL_BLEND_STYLES = new Set(['m15']);
+
+// Slider snap targets: every multiple of 10, plus 25/50/75.
+const BLEND_SNAP = [...Array.from({ length: 11 }, (_, i) => i * 10), 25, 50, 75]
+  .sort((a, b) => a - b);
+
+function snapBlend(value) {
+  return BLEND_SNAP.reduce((best, t) =>
+    Math.abs(t - value) < Math.abs(best - value) ? t : best, BLEND_SNAP[0]);
+}
+
+// Current blend override from the modal slider: null when the deck isn't a
+// two-color blend style (slider hidden) so buildDeckModel falls back to auto.
+function currentBlendRatio() {
+  if (editBlendGroup.style.display === 'none') return null;
+  return Number(editBlendSlider.value) / 100;
+}
 
 function closeEdit() {
   if (editModal.style.display === 'none') return;
@@ -445,7 +469,10 @@ async function buildPreviewModel() {
     artOverride = await resolveArtUrl(editArtUrlInput.value.trim());
   }
 
-  return { model: buildDeckModel(deck, entry.wmKey, artOverride), styleKey };
+  return {
+    model: buildDeckModel(deck, entry.wmKey, artOverride, { blendRatio: currentBlendRatio() }),
+    styleKey,
+  };
 }
 
 async function renderCardPreview() {
@@ -482,6 +509,49 @@ function scheduleCardPreview() {
 editTextarea.addEventListener('input', scheduleCardPreview);
 editSubtitleInput.addEventListener('input', scheduleCardPreview);
 
+// ── BLEND SLIDER ──────────────────────────────────────────────────────────────
+// Update the readout, snap to an allowed value, and live-preview the blend.
+
+function setBlendReadout(pct) {
+  editBlendValue.textContent = `${Math.round(pct)}%`;
+}
+
+editBlendSlider.addEventListener('input', () => {
+  const snapped = snapBlend(Number(editBlendSlider.value));
+  editBlendSlider.value = String(snapped);
+  setBlendReadout(snapped);
+  scheduleCardPreview();
+});
+
+// Reset to automatic: re-seed the slider from the deck's computed split, and
+// flag the saved blendRatio for clearing (handled in the save handler).
+let _blendAuto = true;   // true while the slider tracks the auto split
+document.getElementById('editBlendReset').addEventListener('click', () => {
+  _blendAuto = true;
+  seedBlendSlider();
+  scheduleCardPreview();
+  editBlendSlider.focus();
+});
+
+// Any manual drag opts out of auto mode (so save persists the chosen ratio).
+editBlendSlider.addEventListener('pointerdown', () => { _blendAuto = false; });
+editBlendSlider.addEventListener('keydown',     () => { _blendAuto = false; });
+
+// Seed the slider from the deck's CURRENT computed split (auto preset), built
+// once with no override. Falls back to 50% if the model can't be built.
+function seedBlendSlider() {
+  const entry = getState(editingIndex);
+  let pct = 50;
+  if (entry) {
+    try {
+      const auto = buildDeckModel(entry.deck, entry.wmKey, '').splitRatio;
+      pct = snapBlend(Math.round(auto * 100));
+    } catch { /* keep 50 */ }
+  }
+  editBlendSlider.value = String(pct);
+  setBlendReadout(pct);
+}
+
 document.getElementById('editSaveBtn').addEventListener('click', async () => {
   const text = editTextarea.value.trim();
   if (!text || editingIndex < 0) return;
@@ -503,6 +573,10 @@ document.getElementById('editSaveBtn').addEventListener('click', async () => {
   const patch = { deck };
   if (MODAL_ART_STYLES.has(styleKey)) {
     patch.artOverride = editArtUrlInput.value.trim();
+  }
+  if (MODAL_BLEND_STYLES.has(styleKey)) {
+    // Auto mode persists null (re-derives from pip counts); otherwise the chosen ratio.
+    patch.blendRatio = _blendAuto ? null : Number(editBlendSlider.value) / 100;
   }
   updateState(editingIndex, patch);
 
@@ -553,8 +627,23 @@ function openEdit(index) {
     resolveArtUrl(artVal).then(setArtPreview);
   }
 
+  // Blend slider: m15 only. Seed from the saved override, or the deck's
+  // computed auto split when there's none.
+  const hasBlend = MODAL_BLEND_STYLES.has(styleKey);
+  editBlendGroup.style.display = hasBlend ? '' : 'none';
+  editingIndex = index;            // seedBlendSlider reads the current entry
+  if (hasBlend) {
+    _blendAuto = entry.blendRatio == null;
+    if (_blendAuto) {
+      seedBlendSlider();
+    } else {
+      const pct = snapBlend(Math.round(entry.blendRatio * 100));
+      editBlendSlider.value = String(pct);
+      setBlendReadout(pct);
+    }
+  }
+
   editTextarea.value = deckToManualText(entry.deck);
-  editingIndex = index;
   editModal.style.display = 'flex';
   editTextarea.focus();
   renderCardPreview();   // seed the live preview with the current card

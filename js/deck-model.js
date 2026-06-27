@@ -81,7 +81,7 @@ export function deckArtUrl(deck) {
 
 // ── BUILD MODEL ──────────────────────────────────────────────────────────────
 
-export function buildDeckModel(deck, wmKey, artOverride) {
+export function buildDeckModel(deck, wmKey, artOverride, opts = {}) {
   const { primary, secondary } = primarySecondary(deck);
   const colorIdent = deckColorIdentity(deck);
 
@@ -93,6 +93,13 @@ export function buildDeckModel(deck, wmKey, artOverride) {
     const counts = deckColors(deck);
     const a = counts[primary] ?? 0, b = counts[secondary] ?? 0;
     if (a + b > 0) splitRatio = Math.max(0.5, Math.min(0.85, a / (a + b)));
+  }
+
+  // Manual blend override (Unit 5 slider): replaces the auto pip-count ratio.
+  // Clamped to a slightly wider range than the auto value so the user can push
+  // the split further in either direction.
+  if (opts.blendRatio != null) {
+    splitRatio = Math.max(0.5, Math.min(0.9, opts.blendRatio));
   }
 
   // Build sections (type groups ordered by TYPE_ORDER, 'Other' excluded)
