@@ -12,7 +12,7 @@ import {
   extractCubeId, fetchCubeData, parseDecks,
   listCachedIds, parseManualDeck, parseDeckYaml,
 } from './cube-source.js';
-import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases } from './cards-ui.js?v=30';
+import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases } from './cards-ui.js?v=31';
 
 // ── DOM REFERENCES ────────────────────────────────────────────────────────────
 
