@@ -8,6 +8,7 @@ import { loadImage, ensureFonts } from './assets.js';
 import { COLOR_HEX }           from '../config.js';
 import { cutRoundedCorners, roundRectPath } from './canvas-util.js';
 import { drawColorPips }       from './pips.js';
+import { buildTextMarkup }     from './markup.js';
 import { writeText }           from './text.js';
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -138,20 +139,6 @@ function drawColorOutline(ctx, w, h, model) {
   roundRectPath(ctx, inset, inset, w - 2 * inset, h - 2 * inset, Math.max(0, r - inset));
   ctx.stroke();
   ctx.restore();
-}
-
-// ── TEXT MARKUP BUILDER ────────────────────────────────────────────────────────
-
-function buildTextMarkup(model) {
-  const lines = [];
-  for (const section of model.sections) {
-    lines.push(`{bold}${section.type} (${section.total}){/bold}`);
-    for (const row of section.rows) {
-      const prefix = row.count > 1 ? `{right5}${row.count}x{right130}` : `{right130}`;
-      lines.push(`${prefix}{fontcolor${row.rarityHex}}◆ {fontcolor#000000}${row.name} ${row.cost}`);
-    }
-  }
-  return lines.join('\\n');
 }
 
 // ── RENDERER OBJECT ───────────────────────────────────────────────────────────

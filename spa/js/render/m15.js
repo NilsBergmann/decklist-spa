@@ -7,6 +7,7 @@ import { register }          from './registry.js';
 import { loadImage, manaSrc, MANA_CODES, ensureFonts } from './assets.js';
 import { cutRoundedCorners } from './canvas-util.js';
 import { drawColorPips }     from './pips.js';
+import { buildTextMarkup }   from './markup.js';
 import { scaleX, scaleY, scaleWidth, scaleHeight, writeText } from './text.js';
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -43,24 +44,6 @@ const RULES_TEXTOBJ = {
 
 function frameSrc(color) {
   return `assets/frames/m15/fullTextAlt/${COLOR_TO_FRAME[color] || 'l'}.png`;
-}
-
-// ── TEXT MARKUP BUILDER ───────────────────────────────────────────────────────
-// Converts the style-agnostic model.sections into the CC token string consumed
-// by writeText. This is the ONLY place where CC markup is generated.
-
-function buildTextMarkup(model) {
-  const lines = [];
-  for (const section of model.sections) {
-    lines.push(`{bold}${section.type} (${section.total}){/bold}`);
-    for (const row of section.rows) {
-      // {rightN}: absolute tab-stop at N×fontSize/100 px from text-box left.
-      // Diamond always at {right130}; count prefix sits at {right5}.
-      const prefix = row.count > 1 ? `{right5}${row.count}x{right130}` : `{right130}`;
-      lines.push(`${prefix}{fontcolor${row.rarityHex}}◆ {fontcolor#000000}${row.name} ${row.cost}`);
-    }
-  }
-  return lines.join('\\n');
 }
 
 // ── DRAW FRAMES ───────────────────────────────────────────────────────────────
