@@ -199,17 +199,43 @@ window.addEventListener('afterprint', disposePrintCanvases);
 const fullscreenModal  = document.getElementById('fullscreenModal');
 const fullscreenCanvas = document.getElementById('fullscreenCanvas');
 
+// ── MODAL FOCUS MANAGEMENT (a11y) ────────────────────────────────────────────
+// Remember what had focus before a modal opened so it can be restored on close,
+// and keep Tab focus cycling within the open modal.
+
+let _returnFocus = null;
+
+function trapFocus(modal, e) {
+  if (e.key !== 'Tab') return;
+  const focusable = [...modal.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+  )].filter(el => !el.disabled && el.offsetParent !== null);
+  if (!focusable.length) return;
+  const first = focusable[0], last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+
+function restoreFocus() {
+  _returnFocus?.focus?.();
+  _returnFocus = null;
+}
+
 function closeFullscreen() {
+  if (fullscreenModal.style.display === 'none') return;
   fullscreenModal.style.display = 'none';
   disposeCanvas(fullscreenCanvas);   // free the full-res backing store
+  restoreFocus();
 }
 
 document.getElementById('fullscreenClose').addEventListener('click', closeFullscreen);
 fullscreenModal.addEventListener('click', e => {
   if (e.target === fullscreenModal) closeFullscreen();
 });
+fullscreenModal.addEventListener('keydown', e => trapFocus(fullscreenModal, e));
 
 async function openFullscreen(index) {
+  _returnFocus = document.activeElement;
   const src = await renderFullRes(index);
   if (!src) return;
   fullscreenCanvas.width  = src.width;
@@ -217,6 +243,7 @@ async function openFullscreen(index) {
   fullscreenCanvas.getContext('2d').drawImage(src, 0, 0);
   disposeCanvas(src);
   fullscreenModal.style.display = 'flex';
+  document.getElementById('fullscreenClose').focus();
 }
 
 // ── EDIT MODAL ────────────────────────────────────────────────────────────────
@@ -241,15 +268,18 @@ let   editingIndex = -1;
 const MODAL_ART_STYLES = new Set(['art-bg', 'cover']);
 
 function closeEdit() {
+  if (editModal.style.display === 'none') return;
   editModal.style.display = 'none';
   _cardPreviewSeq++;                 // cancel any in-flight preview render
   clearTimeout(_cardPreviewTimer);
   disposeCanvas(editPreviewCanvas);  // free the preview backing store
+  restoreFocus();
 }
 
 document.getElementById('editClose').addEventListener('click',    closeEdit);
 document.getElementById('editCancelBtn').addEventListener('click', closeEdit);
 editModal.addEventListener('click', e => { if (e.target === editModal) closeEdit(); });
+editModal.addEventListener('keydown', e => trapFocus(editModal, e));
 
 // ── ART PICKER HELPERS ────────────────────────────────────────────────────────
 
@@ -493,6 +523,7 @@ function openEdit(index) {
   const entry = getState(index);
   if (!entry) return;
 
+  _returnFocus = document.activeElement;
   const styleKey = entry.styleKey ?? 'm15';
 
   // Subtitle: cover only — extract from the "Title | Subtitle" deck name
@@ -546,9 +577,9 @@ function addCardOverlay(cell, index) {
   const btnRow = document.createElement('div');
   btnRow.className = 'card-overlay-btns';
   btnRow.innerHTML = `
-    <button class="card-btn btn-fullscreen" title="Fullscreen">⛶</button>
-    <button class="card-btn btn-download"   title="Download PNG">↓</button>
-    <button class="card-btn btn-edit"       title="Edit">✎</button>
+    <button class="card-btn btn-fullscreen" title="Fullscreen"   aria-label="Fullscreen">⛶</button>
+    <button class="card-btn btn-download"   title="Download PNG" aria-label="Download PNG">↓</button>
+    <button class="card-btn btn-edit"       title="Edit"         aria-label="Edit deck">✎</button>
   `;
   overlay.appendChild(btnRow);
 
