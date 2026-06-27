@@ -81,15 +81,39 @@ export function deckArtUrl(deck) {
 
 // ── BUILD MODEL ──────────────────────────────────────────────────────────────
 
-export function buildDeckModel(deck, wmKey, artOverride) {
-  const { primary, secondary } = primarySecondary(deck);
-  const colorIdent = deckColorIdentity(deck);
+// Derive { primary, secondary } from an explicit WUBRG-sorted color list, the
+// same way primarySecondary derives them from pip counts:
+//   length 1 → primary=secondary=that color
+//   length 2 → primary=first, secondary=second
+//   length ≥3 → primary=secondary='M'
+//   ['C']    → 'C'
+function primarySecondaryFromColors(colors) {
+  if (colors.length === 1) return { primary: colors[0], secondary: colors[0] };
+  if (colors.length === 2) return { primary: colors[0], secondary: colors[1] };
+  return { primary: 'M', secondary: 'M' };
+}
+
+export function buildDeckModel(deck, wmKey, artOverride, opts = {}) {
+  const override = Array.isArray(opts.colorOverride) && opts.colorOverride.length
+    ? opts.colorOverride
+    : null;
+
+  let primary, secondary, colorIdent;
+  if (override) {
+    // ['C'] is allowed and stays as-is; otherwise WUBRG-sort the override.
+    colorIdent = override.includes('C') ? ['C'] : WUBRG.filter(c => override.includes(c));
+    if (!colorIdent.length) colorIdent = ['C'];
+    ({ primary, secondary } = primarySecondaryFromColors(colorIdent));
+  } else {
+    ({ primary, secondary } = primarySecondary(deck));
+    colorIdent = deckColorIdentity(deck);
+  }
 
   // Fraction of the frame/watermark width given to the PRIMARY (dominant) color,
   // by pip count. Only meaningful for two-color decks (mono/3+ collapse to one
   // frame). Clamped so the secondary "splash" always stays visible.
   let splitRatio = 0.5;
-  if (primary !== secondary) {
+  if (primary !== secondary && !override) {
     const counts = deckColors(deck);
     const a = counts[primary] ?? 0, b = counts[secondary] ?? 0;
     if (a + b > 0) splitRatio = Math.max(0.5, Math.min(0.85, a / (a + b)));
