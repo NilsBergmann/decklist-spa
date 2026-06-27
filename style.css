@@ -398,7 +398,7 @@ button.danger:active         { background: #b91c1c; }
 .modal-box {
   background: #252525;
   border-radius: 10px;
-  width: min(880px, 96vw);
+  width: min(1040px, 96vw);
   max-height: 92vh;
   display: flex;
   flex-direction: column;
@@ -421,7 +421,7 @@ button.danger:active         { background: #b91c1c; }
 }
 .modal-preview {
   flex-shrink: 0;
-  width: 268px;
+  width: 360px;
   padding: 14px 18px;
   border-left: 1px solid #383838;
   display: flex;
@@ -446,10 +446,10 @@ button.danger:active         { background: #b91c1c; }
 
 /* Keep the preview on the side at all widths — just narrow it on smaller screens. */
 @media (max-width: 720px) {
-  .modal-preview { width: 200px; padding: 12px; }
+  .modal-preview { width: 260px; padding: 12px; }
 }
 @media (max-width: 560px) {
-  .modal-preview { width: 150px; padding: 10px; }
+  .modal-preview { width: 180px; padding: 10px; }
 }
 
 .modal-header {
@@ -588,7 +588,7 @@ button.danger:active         { background: #b91c1c; }
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   padding: 10px;
-  max-height: 220px;
+  max-height: 340px;
   overflow-y: auto;
 }
 .art-picker-thumb {
