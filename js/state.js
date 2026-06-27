@@ -1,6 +1,6 @@
 // ── ACTIVE CARD STATE ────────────────────────────────────────────────────────
 // Replaces DOM-stashed state (downloadBtn._decks, cell._meta).
-// Each entry: { deck, wmKey, styleKey, artOverride, model, cell }
+// Each entry: { deck, wmKey, styleKey, artOverride, artTransform, model, cell }
 
 const _entries = [];
 
