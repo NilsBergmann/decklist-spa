@@ -50,9 +50,13 @@ function colorGradient(ctx, x0, x1, model) {
 // ── DRAW BACKGROUND ────────────────────────────────────────────────────────────
 
 // Cover-fit the art image (center-cropped) over the whole canvas.
+// Scryfall art_crop is only ~626px wide, so it's upscaled heavily here — use
+// high-quality resampling so it reads smoother rather than blocky.
 function drawArtImage(ctx, w, h, img) {
   const scale = Math.max(w / img.width, h / img.height);
   const dw = img.width * scale, dh = img.height * scale;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
 }
 

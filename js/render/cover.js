@@ -33,6 +33,9 @@ async function drawCoverArt(ctx, w, h, model) {
       const img = await loadImage(model.artUrl);
       const scale = Math.max(bw / img.width, bh / img.height);
       const dw = img.width * scale, dh = img.height * scale;
+      // art_crop is low-res (~626px) and gets upscaled — resample at high quality.
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, bx + (bw - dw) / 2, by + (bh - dh) / 2, dw, dh);
       ctx.restore();
       return;
