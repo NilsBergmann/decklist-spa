@@ -410,6 +410,10 @@ function scheduleCardPreview() {
   _cardPreviewTimer = setTimeout(renderCardPreview, 300);
 }
 
+// Every editable input that feeds buildPreviewModel re-renders the preview:
+// deck text (incl. the title line), subtitle, and the art URL. Art-thumbnail
+// clicks (deck grid + Scryfall search) call scheduleCardPreview from their own
+// handlers in buildArtThumb. The watermark is not editable inside the modal.
 editTextarea.addEventListener('input', scheduleCardPreview);
 editSubtitleInput.addEventListener('input', scheduleCardPreview);
 

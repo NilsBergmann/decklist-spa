@@ -403,15 +403,12 @@ button.danger:active         { background: #b91c1c; }
   display: block;
 }
 
+/* Keep the preview on the side at all widths — just narrow it on smaller screens. */
 @media (max-width: 720px) {
-  .modal-body { flex-direction: column; }
-  .modal-preview {
-    width: auto;
-    border-left: none;
-    border-top: 1px solid #383838;
-    order: -1;
-  }
-  #editPreviewCanvas { width: 180px; }
+  .modal-preview { width: 200px; padding: 12px; }
+}
+@media (max-width: 560px) {
+  .modal-preview { width: 150px; padding: 10px; }
 }
 
 .modal-header {
