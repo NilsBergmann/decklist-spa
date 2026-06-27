@@ -612,6 +612,26 @@ button.danger:active         { background: #b91c1c; }
   color: #555;
   font-size: 18px;
 }
+/* "Find other artworks" button — top-right corner of deck-tab thumbs, on hover. */
+.art-picker-thumb-find {
+  position: absolute;
+  top: 3px; right: 3px;
+  width: 20px; height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: rgba(0,0,0,.72);
+  color: #ddd;
+  font-size: 11px;
+  line-height: 20px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s;
+}
+.art-picker-thumb:hover .art-picker-thumb-find,
+.art-picker-thumb-find:focus-visible { opacity: 1; }
+.art-picker-thumb-find:hover { background: #5b9cf6; }
 .art-picker-thumb-name {
   position: absolute;
   bottom: 0; left: 0; right: 0;
