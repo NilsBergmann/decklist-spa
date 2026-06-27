@@ -481,9 +481,23 @@ button.danger:active         { background: #b91c1c; }
 }
 .modal-field input:focus { border-color: #666; }
 
-/* art url row: input + live preview thumbnail */
+/* art url row: input + reset button + live preview thumbnail */
 .art-url-row { display: flex; gap: 8px; align-items: center; }
 .art-url-row input { flex: 1; min-width: 0; }
+.art-reset-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+  background: #333;
+  color: #bbb;
+  border: 1px solid #444;
+  border-radius: 5px;
+}
+.art-reset-btn:hover  { background: #444; color: #fff; }
+.art-reset-btn:active { background: #4a4a4a; }
 .art-preview-thumb {
   width: 50px;
   height: 36px;
