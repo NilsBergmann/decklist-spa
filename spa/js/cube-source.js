@@ -344,6 +344,25 @@ export function parseDeckYaml(text) {
   return decks.filter(d => d.cards.length > 0);
 }
 
+// ── SCRYFALL ART SEARCH ───────────────────────────────────────────────────────
+// Search Scryfall by card name; returns up to 20 unique artworks.
+// Used by the "Search Scryfall" tab in the edit modal art picker.
+
+export async function searchScryfallArt(query) {
+  if (!query || query.length < 2) return [];
+  try {
+    const r = await fetch(
+      `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&unique=art&order=released`,
+    );
+    if (!r.ok) return [];
+    const d = await r.json();
+    return (d.data ?? [])
+      .filter(c => c.image_uris?.art_crop)
+      .map(c => ({ name: c.name, artUrl: c.image_uris.art_crop }))
+      .slice(0, 20);
+  } catch { return []; }
+}
+
 // ── SCRYFALL ART URL RESOLUTION ───────────────────────────────────────────────
 // If `input` is a Scryfall card page URL (scryfall.com/card/{set}/{num}[/…]),
 // fetch the card via the API and return the art_crop image URL.
