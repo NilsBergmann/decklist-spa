@@ -34,6 +34,23 @@ function setStatus(msg, type = '') {
   statusEl.className   = type;
 }
 
+// ── SETTINGS PERSISTENCE ──────────────────────────────────────────────────────
+// Remember the user's style / watermark / page-size / crop-marks choices across
+// reloads. Restored after the dropdowns are populated (see below).
+
+const SETTINGS_KEY = 'decklist:settings';
+
+function loadSettings() {
+  try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) ?? {}; }
+  catch { return {}; }
+}
+
+function saveSettings(patch) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...loadSettings(), ...patch }));
+  } catch {}
+}
+
 // ── WATERMARK DROPDOWN ────────────────────────────────────────────────────────
 
 const wmSelect = document.getElementById('watermark');
@@ -59,9 +76,13 @@ function queueRerender(patch) {
 const ART_STYLES = new Set(['art-bg', 'cover']);
 styleSelect.addEventListener('change', () => {
   artUrlGroup.style.display = ART_STYLES.has(styleSelect.value) ? '' : 'none';
+  saveSettings({ style: styleSelect.value });
   queueRerender({ styleKey: styleSelect.value });
 });
-wmSelect.addEventListener('change', () => queueRerender({ wmKey: wmSelect.value }));
+wmSelect.addEventListener('change', () => {
+  saveSettings({ watermark: wmSelect.value });
+  queueRerender({ wmKey: wmSelect.value });
+});
 document.getElementById('artUrl')
   .addEventListener('change', e => queueRerender({ artOverride: e.target.value.trim() }));
 
@@ -126,8 +147,34 @@ function applyPageSettings() {
 }
 
 // Page size + crop marks only affect print/layout CSS — apply live, no re-render.
-document.getElementById('pageSize').addEventListener('change', applyPageSettings);
-document.getElementById('cropMarks').addEventListener('change', applyPageSettings);
+const pageSizeEl  = document.getElementById('pageSize');
+const cropMarksEl = document.getElementById('cropMarks');
+pageSizeEl.addEventListener('change', () => {
+  saveSettings({ pageSize: pageSizeEl.value });
+  applyPageSettings();
+});
+cropMarksEl.addEventListener('change', () => {
+  saveSettings({ cropMarks: cropMarksEl.checked });
+  applyPageSettings();
+});
+
+// ── RESTORE SAVED SETTINGS ────────────────────────────────────────────────────
+// Apply persisted choices now that every control + applyPageSettings exists.
+// Only restore a value when its option still exists (renderers/sets can change).
+(function restoreSettings() {
+  const s = loadSettings();
+  if (s.style && [...styleSelect.options].some(o => o.value === s.style)) {
+    styleSelect.value = s.style;
+  }
+  if (s.watermark && [...wmSelect.options].some(o => o.value === s.watermark)) {
+    wmSelect.value = s.watermark;
+  }
+  if (s.pageSize) pageSizeEl.value = s.pageSize;
+  if (typeof s.cropMarks === 'boolean') cropMarksEl.checked = s.cropMarks;
+
+  artUrlGroup.style.display = ART_STYLES.has(styleSelect.value) ? '' : 'none';
+  applyPageSettings();
+})();
 
 // ── GENERATE ──────────────────────────────────────────────────────────────────
 
