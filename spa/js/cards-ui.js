@@ -341,6 +341,15 @@ artPickerSearch.addEventListener('input', () => {
   }, 400);
 });
 
+// Reset art to automatic: clear the override, preview, and any selected thumb.
+document.getElementById('editArtReset').addEventListener('click', () => {
+  editArtUrlInput.value = '';
+  setArtPreview('');
+  document.querySelectorAll('.art-picker-thumb.selected').forEach(t => t.classList.remove('selected'));
+  scheduleCardPreview();
+  editArtUrlInput.focus();
+});
+
 // Live art preview as URL is typed
 let _previewTimer = null;
 editArtUrlInput.addEventListener('input', () => {
