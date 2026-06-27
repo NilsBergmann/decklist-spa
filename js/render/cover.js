@@ -31,12 +31,15 @@ async function drawCoverArt(ctx, w, h, model) {
   if (model.artUrl) {
     try {
       const img = await loadImage(model.artUrl);
-      const scale = Math.max(bw / img.width, bh / img.height);
+      const t = model.artTransform ?? { x: 0, y: 0, zoom: 1 };
+      const scale = Math.max(bw / img.width, bh / img.height) * (t.zoom ?? 1);
       const dw = img.width * scale, dh = img.height * scale;
       // art_crop is low-res (~626px) and gets upscaled — resample at high quality.
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, bx + (bw - dw) / 2, by + (bh - dh) / 2, dw, dh);
+      const dx = bx + (bw - dw) / 2 + (t.x ?? 0) * bw;
+      const dy = by + (bh - dh) / 2 + (t.y ?? 0) * bh;
+      ctx.drawImage(img, dx, dy, dw, dh);
       ctx.restore();
       return;
     } catch { /* CORS / 404 → gradient fallback */ }

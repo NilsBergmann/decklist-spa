@@ -158,6 +158,15 @@
         <div class="modal-preview">
           <div class="modal-preview-label">Live preview</div>
           <canvas id="editPreviewCanvas"></canvas>
+          <!-- Art reposition: pan (drag the canvas) + zoom + reset; art styles only -->
+          <div id="editArtTransform" class="art-transform" style="display:none">
+            <div class="art-transform-hint">Drag the art to reposition</div>
+            <div class="art-transform-row">
+              <label for="editArtZoom">Zoom</label>
+              <input id="editArtZoom" type="range" min="1" max="3" step="0.01" value="1">
+            </div>
+            <button id="editArtTransformReset" class="secondary art-transform-reset" type="button">Reset position</button>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
