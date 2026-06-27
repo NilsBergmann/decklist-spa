@@ -384,12 +384,16 @@ export async function resolveArtUrl(input) {
         const d = await r.json();
         const uris = d.image_uris ?? d.card_faces?.[0]?.image_uris;
         const resolved = uris?.art_crop ?? url;
-        _artResolveCache.set(url, resolved);
+        _artResolveCache.set(url, resolved);   // cache only a successful resolve
         return resolved;
       }
     } catch { /* network error — fall through */ }
+    // Fetch failed or returned non-OK: return the raw URL but DON'T cache it,
+    // so a later retry can resolve it instead of being stuck on the fallback.
+    return url;
   }
 
+  // Non-Scryfall input is already final — safe to cache the passthrough.
   _artResolveCache.set(url, url);
   return url;
 }
