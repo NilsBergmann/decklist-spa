@@ -1,7 +1,10 @@
 // ── ACTIVE CARD STATE ────────────────────────────────────────────────────────
 // Replaces DOM-stashed state (downloadBtn._decks, cell._meta).
-// Each entry: { deck, wmKey, styleKey, artOverride, blendRatio, model, cell }
-//   blendRatio: null = auto (pip-count split); 0.5–0.9 = manual blend slider.
+// Each entry: { deck, wmKey, styleKey, artOverride, colorOverride, blendRatio,
+//               artTransform, model, cell }
+//   colorOverride: null = auto; else WUBRG letters (or ['C']) for the pack colors.
+//   blendRatio:    null = auto (pip-count split); 0.5–0.9 = manual blend slider.
+//   artTransform:  { x, y, zoom } pan/zoom for the art box (default {0,0,1}).
 
 const _entries = [];
 
