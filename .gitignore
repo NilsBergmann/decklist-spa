@@ -219,3 +219,6 @@ __marimo__/
 *.cardconjurer
 .vscode/
 .claude/
+
+# Local-only working notes
+todo.md
