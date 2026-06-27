@@ -52,12 +52,15 @@ function colorGradient(ctx, x0, x1, model) {
 // Cover-fit the art image (center-cropped) over the whole canvas.
 // Scryfall art_crop is only ~626px wide, so it's upscaled heavily here — use
 // high-quality resampling so it reads smoother rather than blocky.
-function drawArtImage(ctx, w, h, img) {
-  const scale = Math.max(w / img.width, h / img.height);
+function drawArtImage(ctx, w, h, img, transform) {
+  const t = transform ?? { x: 0, y: 0, zoom: 1 };
+  const scale = Math.max(w / img.width, h / img.height) * (t.zoom ?? 1);
   const dw = img.width * scale, dh = img.height * scale;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  const dx = (w - dw) / 2 + (t.x ?? 0) * w;
+  const dy = (h - dh) / 2 + (t.y ?? 0) * h;
+  ctx.drawImage(img, dx, dy, dw, dh);
 }
 
 // Soft diagonal gradient built from the deck's color identity.
@@ -77,7 +80,7 @@ function drawGradient(ctx, w, h, model) {
 async function drawArtBackground(ctx, w, h, model) {
   if (model.artUrl) {
     try {
-      drawArtImage(ctx, w, h, await loadImage(model.artUrl));
+      drawArtImage(ctx, w, h, await loadImage(model.artUrl), model.artTransform);
       return;
     } catch { /* CORS / 404 → fall through to gradient */ }
   }

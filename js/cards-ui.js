@@ -60,7 +60,7 @@ export async function renderOneCell(index) {
   const entry = getState(index);
   if (!entry) return;
   const artOverride = await resolveArtUrl(entry.artOverride ?? '');
-  const model = buildDeckModel(entry.deck, entry.wmKey, artOverride);
+  const model = buildDeckModel(entry.deck, entry.wmKey, artOverride, { artTransform: entry.artTransform });
   updateState(index, { model });
   const tmp = await renderFullRes(index);
   if (!tmp) return;
@@ -111,7 +111,7 @@ export async function renderDecks(decks, wmKey, styleKey = 'm15', artOverride = 
   // Render all cards concurrently, each into a throwaway full-res canvas.
   await Promise.all(decks.map(async (deck, i) => {
     const resolvedArt = await resolveArtUrl(artOverride);
-    updateState(i, { model: buildDeckModel(deck, wmKey, resolvedArt) });
+    updateState(i, { model: buildDeckModel(deck, wmKey, resolvedArt, { artTransform: getState(i)?.artTransform }) });
     const tmp = await renderFullRes(i);
     if (!tmp) return;
     downsample(tmp, cells[i].querySelector('.card--screen'));
@@ -264,9 +264,24 @@ const artPickerSearch     = document.getElementById('artPickerSearch');
 const artPickerSearchGrid = document.getElementById('artPickerSearchGrid');
 const artPickerSearchStatus = document.getElementById('artPickerSearchStatus');
 const editPreviewCanvas   = document.getElementById('editPreviewCanvas');
+const editArtTransform     = document.getElementById('editArtTransform');
+const editArtZoom          = document.getElementById('editArtZoom');
+const editArtTransformReset = document.getElementById('editArtTransformReset');
 let   editingIndex = -1;
 
 const MODAL_ART_STYLES = new Set(['art-bg', 'cover']);
+
+// ── ART REPOSITION (drag-to-pan + zoom) ───────────────────────────────────────
+// Working transform edited live in the modal; seeded from entry.artTransform in
+// openEdit and persisted on save. buildPreviewModel reads it so dragging/zooming
+// updates the live preview immediately.
+
+const DEFAULT_TRANSFORM = { x: 0, y: 0, zoom: 1 };
+const ZOOM_MIN = 1, ZOOM_MAX = 3;
+
+let _workingTransform = { ...DEFAULT_TRANSFORM };
+
+const clampZoom = z => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
 
 function closeEdit() {
   if (editModal.style.display === 'none') return;
@@ -441,11 +456,13 @@ async function buildPreviewModel() {
   }
 
   let artOverride = '';
+  let artTransform = entry.artTransform;
   if (MODAL_ART_STYLES.has(styleKey)) {
     artOverride = await resolveArtUrl(editArtUrlInput.value.trim());
+    artTransform = _workingTransform;   // live drag/zoom while the modal is open
   }
 
-  return { model: buildDeckModel(deck, entry.wmKey, artOverride), styleKey };
+  return { model: buildDeckModel(deck, entry.wmKey, artOverride, { artTransform }), styleKey };
 }
 
 async function renderCardPreview() {
@@ -475,6 +492,70 @@ function scheduleCardPreview() {
   _cardPreviewTimer = setTimeout(renderCardPreview, 300);
 }
 
+// ── ART REPOSITION CONTROLS ───────────────────────────────────────────────────
+// Show/hide the pan+zoom controls for art styles, seed them from a transform,
+// and wire drag (pan), the zoom slider/wheel, and the reset button.
+
+function showArtTransformControls(show) {
+  editArtTransform.style.display = show ? '' : 'none';
+  editPreviewCanvas.classList.toggle('art-pannable', show);
+}
+
+function seedArtTransform(transform) {
+  _workingTransform = {
+    x: transform?.x ?? 0,
+    y: transform?.y ?? 0,
+    zoom: clampZoom(transform?.zoom ?? 1),
+  };
+  editArtZoom.value = String(_workingTransform.zoom);
+}
+
+// Drag-to-pan: deltas are normalized by the on-screen canvas size so x/y stay in
+// roughly -1..1 regardless of the preview's rendered dimensions.
+let _panning = false, _panStartX = 0, _panStartY = 0, _panBaseX = 0, _panBaseY = 0;
+
+editPreviewCanvas.addEventListener('mousedown', e => {
+  if (editArtTransform.style.display === 'none') return;   // not an art style
+  e.preventDefault();
+  _panning = true;
+  _panStartX = e.clientX; _panStartY = e.clientY;
+  _panBaseX = _workingTransform.x; _panBaseY = _workingTransform.y;
+  editPreviewCanvas.classList.add('panning');
+});
+
+window.addEventListener('mousemove', e => {
+  if (!_panning) return;
+  const rect = editPreviewCanvas.getBoundingClientRect();
+  _workingTransform.x = _panBaseX + (e.clientX - _panStartX) / rect.width;
+  _workingTransform.y = _panBaseY + (e.clientY - _panStartY) / rect.height;
+  scheduleCardPreview();
+});
+
+window.addEventListener('mouseup', () => {
+  if (!_panning) return;
+  _panning = false;
+  editPreviewCanvas.classList.remove('panning');
+});
+
+// Zoom: slider + mouse wheel (clamped ZOOM_MIN..ZOOM_MAX).
+editArtZoom.addEventListener('input', () => {
+  _workingTransform.zoom = clampZoom(parseFloat(editArtZoom.value));
+  scheduleCardPreview();
+});
+
+editPreviewCanvas.addEventListener('wheel', e => {
+  if (editArtTransform.style.display === 'none') return;   // not an art style
+  e.preventDefault();
+  _workingTransform.zoom = clampZoom(_workingTransform.zoom - e.deltaY * 0.001);
+  editArtZoom.value = String(_workingTransform.zoom);
+  scheduleCardPreview();
+}, { passive: false });
+
+editArtTransformReset.addEventListener('click', () => {
+  seedArtTransform(DEFAULT_TRANSFORM);
+  scheduleCardPreview();
+});
+
 // Every editable input that feeds buildPreviewModel re-renders the preview:
 // deck text (incl. the title line), subtitle, and the art URL. Art-thumbnail
 // clicks (deck grid + Scryfall search) call scheduleCardPreview from their own
@@ -503,6 +584,7 @@ document.getElementById('editSaveBtn').addEventListener('click', async () => {
   const patch = { deck };
   if (MODAL_ART_STYLES.has(styleKey)) {
     patch.artOverride = editArtUrlInput.value.trim();
+    patch.artTransform = { ..._workingTransform };
   }
   updateState(editingIndex, patch);
 
@@ -539,6 +621,8 @@ function openEdit(index) {
   const hasArt = MODAL_ART_STYLES.has(styleKey);
   editArtUrlGroup.style.display = hasArt ? '' : 'none';
   editArtPicker.style.display   = hasArt ? '' : 'none';
+  showArtTransformControls(hasArt);
+  seedArtTransform(entry.artTransform);   // also resets working transform for non-art styles
   if (hasArt) {
     const artVal = entry.artOverride ?? '';
     editArtUrlInput.value = artVal;

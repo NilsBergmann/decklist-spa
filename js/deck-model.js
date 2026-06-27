@@ -81,7 +81,7 @@ export function deckArtUrl(deck) {
 
 // ── BUILD MODEL ──────────────────────────────────────────────────────────────
 
-export function buildDeckModel(deck, wmKey, artOverride) {
+export function buildDeckModel(deck, wmKey, artOverride, opts = {}) {
   const { primary, secondary } = primarySecondary(deck);
   const colorIdent = deckColorIdentity(deck);
 
@@ -133,6 +133,7 @@ export function buildDeckModel(deck, wmKey, artOverride) {
     watermark:      resolveWatermark(wmKey, colorIdent, primary, secondary),
     splitRatio,                       // primary-color width fraction (left side)
     artUrl:         (artOverride && artOverride.trim()) || deckArtUrl(deck),  // art-background style
+    artTransform:   opts.artTransform ?? { x: 0, y: 0, zoom: 1 },  // pan/zoom for the art box
     sections,
     manaCodes:      collectManaCodes(deck),
   };
