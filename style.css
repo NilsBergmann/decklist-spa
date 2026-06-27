@@ -314,6 +314,23 @@ button.danger:active         { background: #b91c1c; }
 }
 .card-wm-select option { background: #1e1e1e; }
 
+/* Drag handle for reordering the card grid */
+.card-drag-handle {
+  width: 86%;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1;
+  padding: 3px 0;
+  color: #ddd;
+  background: rgba(0,0,0,0.72);
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 5px;
+  cursor: grab;
+  user-select: none;
+}
+.card-drag-handle:active { cursor: grabbing; }
+.card-cell--dragging { opacity: 0.4; }
+
 /* ── MODALS ──────────────────────────────────────────────── */
 
 .modal-overlay {

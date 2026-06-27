@@ -9,7 +9,8 @@ import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchSc
 import {
   clear as clearState, push as pushState,
   get as getState, update as updateState, getAll as getAllState,
-} from './state.js';
+  move as moveState, indexOfCell,
+} from './state.js?v=2';
 
 // ── DISPLAY CANVAS DIMENSIONS (screen resolution) ────────────────────────────
 
@@ -583,6 +584,25 @@ function addCardOverlay(cell, index) {
   `;
   overlay.appendChild(btnRow);
 
+  // Resolve this cell's CURRENT index live, so handlers stay correct after a
+  // drag reorder (the captured `index` is only valid at creation time).
+  const idxOf = () => indexOfCell(cell);
+
+  // Drag handle (reorder the card grid)
+  const handle = document.createElement('div');
+  handle.className = 'card-drag-handle';
+  handle.title = 'Drag to reorder';
+  handle.setAttribute('aria-label', 'Drag to reorder');
+  handle.textContent = '⠿';
+  handle.draggable = true;
+  handle.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', String(idxOf()));
+    e.dataTransfer.effectAllowed = 'move';
+    cell.classList.add('card-cell--dragging');
+  });
+  handle.addEventListener('dragend', () => cell.classList.remove('card-cell--dragging'));
+  overlay.appendChild(handle);
+
   // Per-card style selector (overrides the global style for this card only)
   const styleSel = document.createElement('select');
   styleSel.className = 'card-wm-select card-style-select';
@@ -611,19 +631,39 @@ function addCardOverlay(cell, index) {
 
   cell.appendChild(overlay);
 
-  btnRow.querySelector('.btn-fullscreen').addEventListener('click', () => openFullscreen(index));
-  btnRow.querySelector('.btn-download').addEventListener('click',   () => downloadCell(index));
-  btnRow.querySelector('.btn-edit').addEventListener('click',       () => openEdit(index));
+  // Drop target: dropping the dragged handle here reorders the grid + state.
+  cell.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+  cell.addEventListener('drop', e => {
+    e.preventDefault();
+    const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
+    const to   = idxOf();
+    if (Number.isNaN(from) || from === to) return;
+    reorderCards(from, to);
+  });
+
+  btnRow.querySelector('.btn-fullscreen').addEventListener('click', () => openFullscreen(idxOf()));
+  btnRow.querySelector('.btn-download').addEventListener('click',   () => downloadCell(idxOf()));
+  btnRow.querySelector('.btn-edit').addEventListener('click',       () => openEdit(idxOf()));
 
   styleSel.addEventListener('change', async () => {
-    updateState(index, { styleKey: styleSel.value });
+    const i = idxOf();
+    updateState(i, { styleKey: styleSel.value });
     styleSel.disabled = true;
-    try { await renderOneCell(index); } finally { styleSel.disabled = false; }
+    try { await renderOneCell(i); } finally { styleSel.disabled = false; }
   });
 
   wmSel.addEventListener('change', async () => {
-    updateState(index, { wmKey: wmSel.value });
+    const i = idxOf();
+    updateState(i, { wmKey: wmSel.value });
     wmSel.disabled = true;
-    try { await renderOneCell(index); } finally { wmSel.disabled = false; }
+    try { await renderOneCell(i); } finally { wmSel.disabled = false; }
   });
+}
+
+// Reorder state + DOM so card `from` lands at position `to`. Handlers resolve
+// their index live (idxOf), so no rebinding is needed.
+function reorderCards(from, to) {
+  moveState(from, to);
+  const grid = document.getElementById('cardGrid');
+  grid.append(...getAllState().map(e => e.cell));   // re-append moves nodes in place
 }
