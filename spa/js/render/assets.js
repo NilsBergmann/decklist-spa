@@ -21,7 +21,12 @@ export function loadImage(src) {
     const img = new Image();
     if (src.startsWith('http')) img.crossOrigin = 'anonymous';
     img.onload  = () => resolve(img);
-    img.onerror = () => reject(new Error(`Failed to load: ${src}`));
+    img.onerror = () => {
+      // Don't cache failures — a transient error must not poison the cache and
+      // block every later load of this src until a full page reload.
+      delete _imgCache[src];
+      reject(new Error(`Failed to load: ${src}`));
+    };
     img.src = src;
   });
   _imgCache[src] = p;
