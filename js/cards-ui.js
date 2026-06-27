@@ -2,7 +2,7 @@
 // Owns: per-card cell creation, overlay buttons, fullscreen + edit modals,
 // per-card watermark selector, single + batch PNG download, downsample helper.
 
-import { get as registryGet }  from './render/registry.js';
+import { get as registryGet, list as registryList } from './render/registry.js';
 import { buildDeckModel }      from './deck-model.js?v=2';
 import { getWatermarks }       from './watermarks.js?v=2';
 import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=33';
@@ -583,6 +583,19 @@ function addCardOverlay(cell, index) {
   `;
   overlay.appendChild(btnRow);
 
+  // Per-card style selector (overrides the global style for this card only)
+  const styleSel = document.createElement('select');
+  styleSel.className = 'card-wm-select card-style-select';
+  styleSel.title = 'Style';
+  const currentStyleKey = getState(index)?.styleKey ?? 'm15';
+  for (const r of registryList()) {
+    const opt = document.createElement('option');
+    opt.value = r.key; opt.textContent = r.label;
+    if (r.key === currentStyleKey) opt.selected = true;
+    styleSel.appendChild(opt);
+  }
+  overlay.appendChild(styleSel);
+
   // Per-card watermark selector
   const wmSel = document.createElement('select');
   wmSel.className = 'card-wm-select';
@@ -601,6 +614,12 @@ function addCardOverlay(cell, index) {
   btnRow.querySelector('.btn-fullscreen').addEventListener('click', () => openFullscreen(index));
   btnRow.querySelector('.btn-download').addEventListener('click',   () => downloadCell(index));
   btnRow.querySelector('.btn-edit').addEventListener('click',       () => openEdit(index));
+
+  styleSel.addEventListener('change', async () => {
+    updateState(index, { styleKey: styleSel.value });
+    styleSel.disabled = true;
+    try { await renderOneCell(index); } finally { styleSel.disabled = false; }
+  });
 
   wmSel.addEventListener('change', async () => {
     updateState(index, { wmKey: wmSel.value });
