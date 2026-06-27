@@ -17,15 +17,19 @@ const DPR = window.devicePixelRatio || 1;
 const D_W = Math.round(63 * 6 * DPR);
 const D_H = Math.round(88 * 6 * DPR);
 
+// Edit-modal live preview: smaller than the grid cell, still crisp.
+const P_W = Math.round(63 * 5 * DPR);
+const P_H = Math.round(88 * 5 * DPR);
+
 // ── CANVAS HELPERS ───────────────────────────────────────────────────────────
 
-function downsample(srcCanvas, screenCanvas) {
-  screenCanvas.width  = D_W;
-  screenCanvas.height = D_H;
+function downsample(srcCanvas, screenCanvas, w = D_W, h = D_H) {
+  screenCanvas.width  = w;
+  screenCanvas.height = h;
   const sctx = screenCanvas.getContext('2d');
   sctx.imageSmoothingEnabled = true;
   sctx.imageSmoothingQuality = 'high';
-  sctx.drawImage(srcCanvas, 0, 0, D_W, D_H);
+  sctx.drawImage(srcCanvas, 0, 0, w, h);
 }
 
 // Free a canvas backing store immediately (don't wait for GC).
@@ -230,13 +234,21 @@ const artPickerSearchPane = document.getElementById('artPickerSearchPane');
 const artPickerGrid       = document.getElementById('artPickerGrid');
 const artPickerSearch     = document.getElementById('artPickerSearch');
 const artPickerSearchGrid = document.getElementById('artPickerSearchGrid');
+const editPreviewCanvas   = document.getElementById('editPreviewCanvas');
 let   editingIndex = -1;
 
 const MODAL_ART_STYLES = new Set(['art-bg', 'cover']);
 
-document.getElementById('editClose').addEventListener('click',    () => { editModal.style.display = 'none'; });
-document.getElementById('editCancelBtn').addEventListener('click', () => { editModal.style.display = 'none'; });
-editModal.addEventListener('click', e => { if (e.target === editModal) editModal.style.display = 'none'; });
+function closeEdit() {
+  editModal.style.display = 'none';
+  _cardPreviewSeq++;                 // cancel any in-flight preview render
+  clearTimeout(_cardPreviewTimer);
+  disposeCanvas(editPreviewCanvas);  // free the preview backing store
+}
+
+document.getElementById('editClose').addEventListener('click',    closeEdit);
+document.getElementById('editCancelBtn').addEventListener('click', closeEdit);
+editModal.addEventListener('click', e => { if (e.target === editModal) closeEdit(); });
 
 // ── ART PICKER HELPERS ────────────────────────────────────────────────────────
 
@@ -261,6 +273,7 @@ function buildArtThumb(artUrl, name, isSelected) {
     div.classList.add('selected');
     editArtUrlInput.value = artUrl;
     setArtPreview(artUrl);
+    scheduleCardPreview();
   });
   return div;
 }
@@ -327,12 +340,78 @@ let _previewTimer = null;
 editArtUrlInput.addEventListener('input', () => {
   clearTimeout(_previewTimer);
   const val = editArtUrlInput.value.trim();
-  if (!val) { setArtPreview(''); return; }
-  _previewTimer = setTimeout(async () => {
-    const resolved = await resolveArtUrl(val);
-    setArtPreview(resolved);
-  }, 600);
+  if (val) {
+    _previewTimer = setTimeout(async () => {
+      const resolved = await resolveArtUrl(val);
+      setArtPreview(resolved);
+    }, 600);
+  } else {
+    setArtPreview('');
+  }
+  scheduleCardPreview();
 });
+
+// ── LIVE CARD PREVIEW (full card, rendered from the modal's current values) ────
+// A sequence id cancels stale renders: rapid edits bump _cardPreviewSeq, and any
+// render whose captured id is no longer current discards its result.
+
+let _cardPreviewSeq   = 0;
+let _cardPreviewTimer = null;
+
+// Build a throwaway deck model from the modal's CURRENT field values (not the
+// saved state), mirroring what the Re-render save handler will eventually do.
+async function buildPreviewModel() {
+  const entry = getState(editingIndex);
+  if (!entry) return null;
+  const styleKey = entry.styleKey ?? 'm15';
+
+  const parsed = parseManualDeck(editTextarea.value.trim());
+  if (!parsed.length) return null;
+  const deck = parsed[0];
+
+  if (styleKey === 'cover') {
+    const subtitle  = editSubtitleInput.value.trim();
+    const baseTitle = deck.name.split('|')[0].trim();
+    deck.name = subtitle ? `${baseTitle} | ${subtitle}` : baseTitle;
+  }
+
+  let artOverride = '';
+  if (MODAL_ART_STYLES.has(styleKey)) {
+    artOverride = await resolveArtUrl(editArtUrlInput.value.trim());
+  }
+
+  return { model: buildDeckModel(deck, entry.wmKey, artOverride), styleKey };
+}
+
+async function renderCardPreview() {
+  const seq = ++_cardPreviewSeq;
+  let built;
+  try { built = await buildPreviewModel(); } catch { return; }
+  if (!built || seq !== _cardPreviewSeq) return;   // bad input or superseded
+
+  const renderer = registryGet(built.styleKey) ?? registryGet('m15');
+  const tmp = document.createElement('canvas');
+  try {
+    await renderer.preload(built.model);
+    if (seq !== _cardPreviewSeq) return;
+    await renderer.render(tmp, built.model);
+  } catch {
+    disposeCanvas(tmp);
+    return;
+  }
+  if (seq !== _cardPreviewSeq) { disposeCanvas(tmp); return; }
+
+  downsample(tmp, editPreviewCanvas, P_W, P_H);
+  disposeCanvas(tmp);
+}
+
+function scheduleCardPreview() {
+  clearTimeout(_cardPreviewTimer);
+  _cardPreviewTimer = setTimeout(renderCardPreview, 300);
+}
+
+editTextarea.addEventListener('input', scheduleCardPreview);
+editSubtitleInput.addEventListener('input', scheduleCardPreview);
 
 document.getElementById('editSaveBtn').addEventListener('click', async () => {
   const text = editTextarea.value.trim();
@@ -363,7 +442,7 @@ document.getElementById('editSaveBtn').addEventListener('click', async () => {
   saveBtn.textContent = 'Rendering…';
   try {
     await renderOneCell(editingIndex);
-    editModal.style.display = 'none';
+    closeEdit();
   } catch (err) {
     alert(`Render error: ${err.message}`);
   } finally {
@@ -407,6 +486,7 @@ function openEdit(index) {
   editingIndex = index;
   editModal.style.display = 'flex';
   editTextarea.focus();
+  renderCardPreview();   // seed the live preview with the current card
 }
 
 // ── ESC TO CLOSE MODALS ───────────────────────────────────────────────────────
@@ -414,7 +494,7 @@ function openEdit(index) {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeFullscreen();
-    editModal.style.display = 'none';
+    if (editModal.style.display !== 'none') closeEdit();
   }
 });
 

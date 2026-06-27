@@ -102,34 +102,42 @@
         <span class="modal-title">Edit deck</span>
         <button class="modal-close-sm" id="editClose" title="Close">✕</button>
       </div>
-      <!-- Per-card fields: shown only for styles that use them -->
-      <div id="editSubtitleGroup" class="modal-field" style="display:none">
-        <label for="editSubtitle">Subtitle</label>
-        <input id="editSubtitle" type="text" placeholder="Tagline shown below the title">
-      </div>
-      <div id="editArtUrlGroup" class="modal-field" style="display:none">
-        <label>Art</label>
-        <div class="art-url-row">
-          <input id="editArtUrl" type="text" placeholder="Image URL or https://scryfall.com/card/… — blank = auto">
-          <div id="editArtPreview" class="art-preview-thumb"></div>
-        </div>
-      </div>
-      <div id="editArtPicker" class="art-picker" style="display:none">
-        <div class="art-picker-tabs">
-          <button class="art-picker-tab active" data-picker-tab="deck">From this deck</button>
-          <button class="art-picker-tab" data-picker-tab="search">Search Scryfall</button>
-        </div>
-        <div id="artPickerDeckPane" class="art-picker-pane">
-          <div id="artPickerGrid" class="art-picker-grid"></div>
-        </div>
-        <div id="artPickerSearchPane" class="art-picker-pane" style="display:none">
-          <div class="art-picker-search-row">
-            <input id="artPickerSearch" type="text" placeholder="Card name…" autocomplete="off">
+      <div class="modal-body">
+        <div class="modal-main">
+          <!-- Per-card fields: shown only for styles that use them -->
+          <div id="editSubtitleGroup" class="modal-field" style="display:none">
+            <label for="editSubtitle">Subtitle</label>
+            <input id="editSubtitle" type="text" placeholder="Tagline shown below the title">
           </div>
-          <div id="artPickerSearchGrid" class="art-picker-grid"></div>
+          <div id="editArtUrlGroup" class="modal-field" style="display:none">
+            <label>Art</label>
+            <div class="art-url-row">
+              <input id="editArtUrl" type="text" placeholder="Image URL or https://scryfall.com/card/… — blank = auto">
+              <div id="editArtPreview" class="art-preview-thumb"></div>
+            </div>
+          </div>
+          <div id="editArtPicker" class="art-picker" style="display:none">
+            <div class="art-picker-tabs">
+              <button class="art-picker-tab active" data-picker-tab="deck">From this deck</button>
+              <button class="art-picker-tab" data-picker-tab="search">Search Scryfall</button>
+            </div>
+            <div id="artPickerDeckPane" class="art-picker-pane">
+              <div id="artPickerGrid" class="art-picker-grid"></div>
+            </div>
+            <div id="artPickerSearchPane" class="art-picker-pane" style="display:none">
+              <div class="art-picker-search-row">
+                <input id="artPickerSearch" type="text" placeholder="Card name…" autocomplete="off">
+              </div>
+              <div id="artPickerSearchGrid" class="art-picker-grid"></div>
+            </div>
+          </div>
+          <textarea id="editTextarea" spellcheck="false"></textarea>
+        </div>
+        <div class="modal-preview">
+          <div class="modal-preview-label">Live preview</div>
+          <canvas id="editPreviewCanvas"></canvas>
         </div>
       </div>
-      <textarea id="editTextarea" spellcheck="false"></textarea>
       <div class="modal-footer">
         <button id="editSaveBtn">Re-render</button>
         <button id="editCancelBtn" class="secondary">Cancel</button>
@@ -137,6 +145,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/main.js?v=34"></script>
+  <script type="module" src="js/main.js?v=35"></script>
 </body>
 </html>

@@ -357,11 +357,61 @@ button.danger:active         { background: #b91c1c; }
 .modal-box {
   background: #252525;
   border-radius: 10px;
-  width: min(620px, 96vw);
+  width: min(880px, 96vw);
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   box-shadow: 0 12px 48px rgba(0,0,0,0.7);
+}
+
+/* Two-column body: fields on the left, live preview on the right */
+.modal-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.modal-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.modal-preview {
+  flex-shrink: 0;
+  width: 268px;
+  padding: 14px 18px;
+  border-left: 1px solid #383838;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.modal-preview-label {
+  font-size: 12px;
+  color: #888;
+  align-self: flex-start;
+}
+#editPreviewCanvas {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 63 / 88;
+  border-radius: 4.5%;
+  background: #1a1a1a;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.55);
+  display: block;
+}
+
+@media (max-width: 720px) {
+  .modal-body { flex-direction: column; }
+  .modal-preview {
+    width: auto;
+    border-left: none;
+    border-top: 1px solid #383838;
+    order: -1;
+  }
+  #editPreviewCanvas { width: 180px; }
 }
 
 .modal-header {
