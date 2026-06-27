@@ -108,8 +108,26 @@
         <input id="editSubtitle" type="text" placeholder="Tagline shown below the title">
       </div>
       <div id="editArtUrlGroup" class="modal-field" style="display:none">
-        <label for="editArtUrl">Art URL</label>
-        <input id="editArtUrl" type="text" placeholder="Image URL or https://scryfall.com/card/… — blank = auto">
+        <label>Art</label>
+        <div class="art-url-row">
+          <input id="editArtUrl" type="text" placeholder="Image URL or https://scryfall.com/card/… — blank = auto">
+          <div id="editArtPreview" class="art-preview-thumb"></div>
+        </div>
+      </div>
+      <div id="editArtPicker" class="art-picker" style="display:none">
+        <div class="art-picker-tabs">
+          <button class="art-picker-tab active" data-picker-tab="deck">From this deck</button>
+          <button class="art-picker-tab" data-picker-tab="search">Search Scryfall</button>
+        </div>
+        <div id="artPickerDeckPane" class="art-picker-pane">
+          <div id="artPickerGrid" class="art-picker-grid"></div>
+        </div>
+        <div id="artPickerSearchPane" class="art-picker-pane" style="display:none">
+          <div class="art-picker-search-row">
+            <input id="artPickerSearch" type="text" placeholder="Card name…" autocomplete="off">
+          </div>
+          <div id="artPickerSearchGrid" class="art-picker-grid"></div>
+        </div>
       </div>
       <textarea id="editTextarea" spellcheck="false"></textarea>
       <div class="modal-footer">
@@ -119,6 +137,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/main.js?v=33"></script>
+  <script type="module" src="js/main.js?v=34"></script>
 </body>
 </html>
