@@ -331,6 +331,30 @@ button.danger:active         { background: #b91c1c; }
 .card-drag-handle:active { cursor: grabbing; }
 .card-cell--dragging { opacity: 0.4; }
 
+/* Inline title/subtitle editor (double-click a card) */
+.inline-title-edit {
+  position: absolute;
+  top: 7%;
+  left: 6%;
+  right: 6%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.inline-title-input {
+  width: 100%;
+  font-size: 12px;
+  padding: 5px 7px;
+  border-radius: 4px;
+  border: 1px solid #5b9cf6;
+  background: rgba(20, 20, 20, 0.96);
+  color: #fff;
+  outline: none;
+}
+/* Hide the hover overlay while inline-editing so it doesn't intercept clicks. */
+.card-cell.inline-editing .card-overlay { display: none; }
+
 /* ── MODALS ──────────────────────────────────────────────── */
 
 .modal-overlay {

@@ -569,6 +569,76 @@ document.addEventListener('keydown', e => {
   }
 });
 
+// ── INLINE TITLE EDIT (double-click a card) ──────────────────────────────────
+// A lightweight rename affordance: double-clicking a card shows an inline
+// title input (plus a subtitle input for the cover style) over the top of the
+// card. Enter / blur commits and re-renders; Escape cancels. For the full deck
+// list use the edit modal (✎).
+
+function startInlineTitleEdit(cell) {
+  if (cell.querySelector('.inline-title-edit')) return;   // already editing
+  const i = indexOfCell(cell);
+  const entry = getState(i);
+  if (!entry) return;
+
+  const isCover = (entry.styleKey ?? 'm15') === 'cover';
+  const [rawTitle, ...rest] = (entry.deck.name ?? '').split('|');
+
+  const box = document.createElement('div');
+  box.className = 'inline-title-edit';
+
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.className = 'inline-title-input';
+  titleInput.value = rawTitle.trim();
+  titleInput.setAttribute('aria-label', 'Card title');
+  box.appendChild(titleInput);
+
+  let subInput = null;
+  if (isCover) {
+    subInput = document.createElement('input');
+    subInput.type = 'text';
+    subInput.className = 'inline-title-input';
+    subInput.placeholder = 'Subtitle';
+    subInput.value = rest.join('|').trim();
+    subInput.setAttribute('aria-label', 'Card subtitle');
+    box.appendChild(subInput);
+  }
+
+  cell.classList.add('inline-editing');
+  cell.appendChild(box);
+  titleInput.focus();
+  titleInput.select();
+
+  let done = false;
+  const cleanup = () => { cell.classList.remove('inline-editing'); box.remove(); };
+  const cancel  = () => { if (done) return; done = true; cleanup(); };
+  const commit  = async () => {
+    if (done) return; done = true;
+    const idx = indexOfCell(cell);                    // resolve live (may have moved)
+    const e2  = getState(idx);
+    cleanup();
+    if (!e2) return;
+    const title = titleInput.value.trim() || 'Deck';
+    const sub   = subInput ? subInput.value.trim() : '';
+    const name  = (isCover && sub) ? `${title} | ${sub}` : title;
+    updateState(idx, { deck: { ...e2.deck, name } });
+    await renderOneCell(idx);
+  };
+
+  for (const inp of box.querySelectorAll('input')) {
+    inp.addEventListener('keydown', e => {
+      e.stopPropagation();                            // don't trip global Esc
+      if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+      else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+    });
+  }
+  // Commit when focus leaves the whole box (click elsewhere / tab out).
+  box.addEventListener('focusout', () => {
+    setTimeout(() => { if (!box.contains(document.activeElement)) commit(); }, 0);
+  });
+}
+
 // ── CARD OVERLAY ──────────────────────────────────────────────────────────────
 
 function addCardOverlay(cell, index) {
@@ -630,6 +700,9 @@ function addCardOverlay(cell, index) {
   overlay.appendChild(wmSel);
 
   cell.appendChild(overlay);
+
+  // Double-click the card image to quickly rename it (inline title editor).
+  cell.querySelector('.card--screen')?.addEventListener('dblclick', () => startInlineTitleEdit(cell));
 
   // Drop target: dropping the dragged handle here reorders the grid + state.
   cell.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
