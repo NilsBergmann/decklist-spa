@@ -5,7 +5,7 @@
 import { get as registryGet }  from './render/registry.js';
 import { buildDeckModel }      from './deck-model.js';
 import { WATERMARKS }          from './watermarks.js';
-import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=32';
+import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=33';
 import {
   clear as clearState, push as pushState,
   get as getState, update as updateState, getAll as getAllState,

@@ -11,8 +11,8 @@ import { WATERMARKS }              from './watermarks.js';
 import {
   extractCubeId, fetchCubeData, parseDecks,
   listCachedIds, parseManualDeck, parseDeckYaml,
-} from './cube-source.js?v=32';
-import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases } from './cards-ui.js?v=35';
+} from './cube-source.js?v=33';
+import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases } from './cards-ui.js?v=36';
 
 // ── DOM REFERENCES ────────────────────────────────────────────────────────────
 
