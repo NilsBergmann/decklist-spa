@@ -311,15 +311,19 @@ document.querySelectorAll('.art-picker-tab').forEach(tab => {
   });
 });
 
-// Scryfall search with debounce
+// Scryfall search with debounce. A monotonic sequence id guards against a slow
+// earlier request resolving after a newer one and overwriting fresher results.
 let _searchTimer = null;
+let _searchSeq   = 0;
 artPickerSearch.addEventListener('input', () => {
   clearTimeout(_searchTimer);
   const q = artPickerSearch.value.trim();
+  const seq = ++_searchSeq;                 // invalidate any in-flight request
   if (!q) { artPickerSearchGrid.innerHTML = ''; return; }
   artPickerSearchGrid.innerHTML = '<div class="art-picker-loading">Searching…</div>';
   _searchTimer = setTimeout(async () => {
     const results = await searchScryfallArt(q);
+    if (seq !== _searchSeq) return;         // a newer search superseded this one
     artPickerSearchGrid.innerHTML = '';
     if (!results.length) {
       const msg = document.createElement('div');
