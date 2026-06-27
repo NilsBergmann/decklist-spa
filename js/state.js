@@ -1,6 +1,7 @@
 // ── ACTIVE CARD STATE ────────────────────────────────────────────────────────
 // Replaces DOM-stashed state (downloadBtn._decks, cell._meta).
-// Each entry: { deck, wmKey, styleKey, artOverride, model, cell }
+// Each entry: { deck, wmKey, styleKey, artOverride, blendRatio, model, cell }
+//   blendRatio: null = auto (pip-count split); 0.5–0.9 = manual blend slider.
 
 const _entries = [];
 

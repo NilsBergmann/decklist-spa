@@ -119,6 +119,13 @@ export function buildDeckModel(deck, wmKey, artOverride, opts = {}) {
     if (a + b > 0) splitRatio = Math.max(0.5, Math.min(0.85, a / (a + b)));
   }
 
+  // Manual blend override (Unit 5 slider): replaces the auto pip-count ratio.
+  // Clamped to a slightly wider range than the auto value so the user can push
+  // the split further in either direction.
+  if (opts.blendRatio != null) {
+    splitRatio = Math.max(0.5, Math.min(0.9, opts.blendRatio));
+  }
+
   // Build sections (type groups ordered by TYPE_ORDER, 'Other' excluded)
   const typeGroups  = groupByType(deck.cards);
   const sortedTypes = Object.keys(typeGroups).sort((a, b) => {
