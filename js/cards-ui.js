@@ -290,7 +290,7 @@ function setArtPreview(resolvedUrl) {
     : '';
 }
 
-function buildArtThumb(artUrl, name, isSelected) {
+function buildArtThumb(artUrl, name, isSelected, withFindButton = false) {
   const div = document.createElement('div');
   div.className = 'art-picker-thumb' + (isSelected ? ' selected' : '');
   div.title = name;
@@ -302,6 +302,21 @@ function buildArtThumb(artUrl, name, isSelected) {
   lbl.className = 'art-picker-thumb-name';
   lbl.textContent = name;
   div.append(img, lbl);
+  // Deck-tab thumbs get a "find more" button: jump to the Scryfall search tab
+  // pre-filled with this card's name to browse its other printings/artworks.
+  if (withFindButton) {
+    const find = document.createElement('button');
+    find.type = 'button';
+    find.className = 'art-picker-thumb-find';
+    find.title = 'Find other artworks';
+    find.setAttribute('aria-label', 'Find other artworks');
+    find.textContent = '🔍';
+    find.addEventListener('click', e => {
+      e.stopPropagation();                 // don't trigger the thumb's select-art
+      findOtherArtworks(name);
+    });
+    div.appendChild(find);
+  }
   div.addEventListener('click', () => {
     document.querySelectorAll('.art-picker-thumb.selected').forEach(t => t.classList.remove('selected'));
     div.classList.add('selected');
@@ -310,6 +325,14 @@ function buildArtThumb(artUrl, name, isSelected) {
     scheduleCardPreview();
   });
   return div;
+}
+
+// Activate the Scryfall search tab pre-filled with a card name and run it.
+// Reuses the tab buttons' own click logic by clicking the search tab.
+function findOtherArtworks(name) {
+  document.querySelector('.art-picker-tab[data-picker-tab="search"]')?.click();
+  artPickerSearch.value = name;
+  runArtSearch(name);
 }
 
 function populateDeckArtGrid(deck) {
@@ -330,7 +353,7 @@ function populateDeckArtGrid(deck) {
   }
   const currentArt = editArtUrlInput.value.trim();
   for (const { artUrl, name } of items) {
-    artPickerGrid.appendChild(buildArtThumb(artUrl, name, artUrl === currentArt));
+    artPickerGrid.appendChild(buildArtThumb(artUrl, name, artUrl === currentArt, true));
   }
 }
 
