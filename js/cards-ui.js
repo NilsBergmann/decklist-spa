@@ -493,6 +493,13 @@ document.getElementById('editSaveBtn').addEventListener('click', async () => {
   const entry     = getState(editingIndex);
   const styleKey  = entry?.styleKey ?? 'm15';
 
+  // ── Preserve per-card art (e.g. Cubecobra art_crop) ──
+  // parseManualDeck doesn't produce an `art` field, so carry it over from the
+  // previous deck by matching on card name. New cards just won't have art.
+  const artByName = new Map();
+  for (const c of entry?.deck?.cards ?? []) if (c.art) artByName.set(c.name, c.art);
+  for (const c of deck.cards) if (!c.art && artByName.has(c.name)) c.art = artByName.get(c.name);
+
   // Merge subtitle back into deck name (cover style only)
   if (styleKey === 'cover') {
     const subtitle = editSubtitleInput.value.trim();
