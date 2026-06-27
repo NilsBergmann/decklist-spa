@@ -87,6 +87,63 @@ export const WATERMARKS = {
   m12:  { label: 'M12 — Magic 2012',                   image: SF('m12') },
 };
 
+// ── DYNAMIC SET LIST (Scryfall, cached) ──────────────────────────────────────
+// The hardcoded WATERMARKS above is the instant fallback. loadWatermarkSets()
+// refreshes the list from Scryfall's /sets endpoint (core + expansion sets,
+// newest first) so newly-released sets appear automatically. Result is cached
+// in localStorage for 24h. getWatermarks() returns whichever map is active.
+
+const SETS_CACHE_KEY = 'decklist:wmSets';
+const SETS_TTL_MS    = 24 * 60 * 60 * 1000;
+
+let _current = WATERMARKS;
+
+export function getWatermarks() { return _current; }
+
+function readSetsCache() {
+  try {
+    const raw = localStorage.getItem(SETS_CACHE_KEY);
+    if (!raw) return null;
+    const { ts, sets } = JSON.parse(raw);
+    if (Date.now() - ts > SETS_TTL_MS) { localStorage.removeItem(SETS_CACHE_KEY); return null; }
+    return sets;
+  } catch { return null; }
+}
+
+function writeSetsCache(sets) {
+  try { localStorage.setItem(SETS_CACHE_KEY, JSON.stringify({ ts: Date.now(), sets })); } catch {}
+}
+
+function buildMapFromSets(sets) {
+  const map = {
+    none:        { label: 'None',             image: null },
+    'set-color': { label: 'Set color (auto)', image: null },
+  };
+  for (const s of sets) {
+    map[s.code] = { label: `${s.code.toUpperCase()} — ${s.name}`, image: s.icon || SF(s.code) };
+  }
+  return map;
+}
+
+export async function loadWatermarkSets() {
+  let sets = readSetsCache();
+  if (!sets) {
+    try {
+      const r = await fetch('https://api.scryfall.com/sets');
+      if (!r.ok) return _current;
+      const d = await r.json();
+      sets = (d.data ?? [])
+        .filter(s => (s.set_type === 'core' || s.set_type === 'expansion') && !s.digital)
+        .sort((a, b) => (b.released_at ?? '').localeCompare(a.released_at ?? ''))
+        .map(s => ({ code: s.code, name: s.name, icon: s.icon_svg_uri }));
+      if (!sets.length) return _current;
+      writeSetsCache(sets);
+    } catch { return _current; }   // offline / blocked → keep the hardcoded fallback
+  }
+  _current = buildMapFromSets(sets);
+  return _current;
+}
+
 // colorIdentity is WUBRG-sorted (e.g. ['W','U']); used only for set-color SVG lookup.
 // primaryColor / secondaryColor are by card count (most common first); used for hex tinting.
 function colorWatermarkSrc(colorIdentity) {
@@ -107,7 +164,7 @@ export function resolveWatermark(wmKey, colorIdentity, primaryColor, secondaryCo
   if (wmKey === 'set-color') {
     source = colorWatermarkSrc(colorIdentity);
   } else {
-    source = WATERMARKS[wmKey]?.image ?? null;
+    source = _current[wmKey]?.image ?? WATERMARKS[wmKey]?.image ?? null;
   }
   return {
     source,

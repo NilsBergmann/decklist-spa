@@ -3,7 +3,7 @@
 // no coords, no font names, no CC markup tokens.
 
 import { WUBRG, TYPE_ORDER, RARITY_ORDER, RARITY_HEX } from './config.js';
-import { resolveWatermark } from './watermarks.js';
+import { resolveWatermark } from './watermarks.js?v=2';
 
 // ── PRIVATE HELPERS ──────────────────────────────────────────────────────────
 
