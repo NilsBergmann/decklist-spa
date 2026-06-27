@@ -5,7 +5,7 @@
 import { get as registryGet }  from './render/registry.js';
 import { buildDeckModel }      from './deck-model.js';
 import { WATERMARKS }          from './watermarks.js';
-import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl } from './cube-source.js?v=31';
+import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=32';
 import {
   clear as clearState, push as pushState,
   get as getState, update as updateState, getAll as getAllState,
@@ -217,12 +217,19 @@ async function openFullscreen(index) {
 
 // ── EDIT MODAL ────────────────────────────────────────────────────────────────
 
-const editModal          = document.getElementById('editModal');
-const editTextarea       = document.getElementById('editTextarea');
-const editSubtitleGroup  = document.getElementById('editSubtitleGroup');
-const editSubtitleInput  = document.getElementById('editSubtitle');
-const editArtUrlGroup    = document.getElementById('editArtUrlGroup');
-const editArtUrlInput    = document.getElementById('editArtUrl');
+const editModal           = document.getElementById('editModal');
+const editTextarea        = document.getElementById('editTextarea');
+const editSubtitleGroup   = document.getElementById('editSubtitleGroup');
+const editSubtitleInput   = document.getElementById('editSubtitle');
+const editArtUrlGroup     = document.getElementById('editArtUrlGroup');
+const editArtUrlInput     = document.getElementById('editArtUrl');
+const editArtPreview      = document.getElementById('editArtPreview');
+const editArtPicker       = document.getElementById('editArtPicker');
+const artPickerDeckPane   = document.getElementById('artPickerDeckPane');
+const artPickerSearchPane = document.getElementById('artPickerSearchPane');
+const artPickerGrid       = document.getElementById('artPickerGrid');
+const artPickerSearch     = document.getElementById('artPickerSearch');
+const artPickerSearchGrid = document.getElementById('artPickerSearchGrid');
 let   editingIndex = -1;
 
 const MODAL_ART_STYLES = new Set(['art-bg', 'cover']);
@@ -230,6 +237,102 @@ const MODAL_ART_STYLES = new Set(['art-bg', 'cover']);
 document.getElementById('editClose').addEventListener('click',    () => { editModal.style.display = 'none'; });
 document.getElementById('editCancelBtn').addEventListener('click', () => { editModal.style.display = 'none'; });
 editModal.addEventListener('click', e => { if (e.target === editModal) editModal.style.display = 'none'; });
+
+// ── ART PICKER HELPERS ────────────────────────────────────────────────────────
+
+function setArtPreview(resolvedUrl) {
+  editArtPreview.innerHTML = resolvedUrl
+    ? `<img src="${resolvedUrl}" alt="">`
+    : '';
+}
+
+function buildArtThumb(artUrl, name, isSelected) {
+  const div = document.createElement('div');
+  div.className = 'art-picker-thumb' + (isSelected ? ' selected' : '');
+  div.title = name;
+  const img = document.createElement('img');
+  img.src = artUrl; img.alt = ''; img.loading = 'lazy';
+  const lbl = document.createElement('div');
+  lbl.className = 'art-picker-thumb-name';
+  lbl.textContent = name;
+  div.append(img, lbl);
+  div.addEventListener('click', () => {
+    document.querySelectorAll('.art-picker-thumb.selected').forEach(t => t.classList.remove('selected'));
+    div.classList.add('selected');
+    editArtUrlInput.value = artUrl;
+    setArtPreview(artUrl);
+  });
+  return div;
+}
+
+function populateDeckArtGrid(deck) {
+  artPickerGrid.innerHTML = '';
+  const seen = new Set();
+  const items = [];
+  for (const card of deck.cards) {
+    if (!card.art || seen.has(card.art)) continue;
+    seen.add(card.art);
+    items.push({ artUrl: card.art, name: card.name });
+  }
+  if (!items.length) {
+    const msg = document.createElement('div');
+    msg.className = 'art-picker-empty';
+    msg.textContent = 'No art in this deck — use Search Scryfall';
+    artPickerGrid.appendChild(msg);
+    return;
+  }
+  const currentArt = editArtUrlInput.value.trim();
+  for (const { artUrl, name } of items) {
+    artPickerGrid.appendChild(buildArtThumb(artUrl, name, artUrl === currentArt));
+  }
+}
+
+// Tab switching
+document.querySelectorAll('.art-picker-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.art-picker-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const pane = tab.dataset.pickerTab;
+    artPickerDeckPane.style.display   = pane === 'deck'   ? '' : 'none';
+    artPickerSearchPane.style.display = pane === 'search' ? '' : 'none';
+  });
+});
+
+// Scryfall search with debounce
+let _searchTimer = null;
+artPickerSearch.addEventListener('input', () => {
+  clearTimeout(_searchTimer);
+  const q = artPickerSearch.value.trim();
+  if (!q) { artPickerSearchGrid.innerHTML = ''; return; }
+  artPickerSearchGrid.innerHTML = '<div class="art-picker-loading">Searching…</div>';
+  _searchTimer = setTimeout(async () => {
+    const results = await searchScryfallArt(q);
+    artPickerSearchGrid.innerHTML = '';
+    if (!results.length) {
+      const msg = document.createElement('div');
+      msg.className = 'art-picker-empty';
+      msg.textContent = 'No results';
+      artPickerSearchGrid.appendChild(msg);
+      return;
+    }
+    const currentArt = editArtUrlInput.value.trim();
+    for (const { artUrl, name } of results) {
+      artPickerSearchGrid.appendChild(buildArtThumb(artUrl, name, artUrl === currentArt));
+    }
+  }, 400);
+});
+
+// Live art preview as URL is typed
+let _previewTimer = null;
+editArtUrlInput.addEventListener('input', () => {
+  clearTimeout(_previewTimer);
+  const val = editArtUrlInput.value.trim();
+  if (!val) { setArtPreview(''); return; }
+  _previewTimer = setTimeout(async () => {
+    const resolved = await resolveArtUrl(val);
+    setArtPreview(resolved);
+  }, 600);
+});
 
 document.getElementById('editSaveBtn').addEventListener('click', async () => {
   const text = editTextarea.value.trim();
@@ -283,10 +386,22 @@ function openEdit(index) {
     editSubtitleInput.value = parts.slice(1).join('|').trim();
   }
 
-  // Art URL: art-bg and cover
+  // Art URL + picker: art-bg and cover
   const hasArt = MODAL_ART_STYLES.has(styleKey);
   editArtUrlGroup.style.display = hasArt ? '' : 'none';
-  if (hasArt) editArtUrlInput.value = entry.artOverride ?? '';
+  editArtPicker.style.display   = hasArt ? '' : 'none';
+  if (hasArt) {
+    const artVal = entry.artOverride ?? '';
+    editArtUrlInput.value = artVal;
+    // Reset to deck tab
+    document.querySelectorAll('.art-picker-tab').forEach((t, i) => t.classList.toggle('active', i === 0));
+    artPickerDeckPane.style.display   = '';
+    artPickerSearchPane.style.display = 'none';
+    artPickerSearch.value = '';
+    artPickerSearchGrid.innerHTML = '';
+    populateDeckArtGrid(entry.deck);
+    resolveArtUrl(artVal).then(setArtPreview);
+  }
 
   editTextarea.value = deckToManualText(entry.deck);
   editingIndex = index;
