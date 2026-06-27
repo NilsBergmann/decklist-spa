@@ -549,6 +549,14 @@ button.danger:active         { background: #b91c1c; }
 .art-picker-thumb:hover { border-color: #666; }
 .art-picker-thumb.selected { border-color: #5b9cf6; }
 .art-picker-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Broken art: hide the empty <img> and show a placeholder glyph behind it. */
+.art-picker-thumb--broken { display: flex; align-items: center; justify-content: center; }
+.art-picker-thumb--broken img { display: none; }
+.art-picker-thumb--broken::before {
+  content: "⊘";
+  color: #555;
+  font-size: 18px;
+}
 .art-picker-thumb-name {
   position: absolute;
   bottom: 0; left: 0; right: 0;

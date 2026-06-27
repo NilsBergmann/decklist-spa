@@ -264,6 +264,8 @@ function buildArtThumb(artUrl, name, isSelected) {
   div.title = name;
   const img = document.createElement('img');
   img.src = artUrl; img.alt = ''; img.loading = 'lazy';
+  // Mark broken thumbnails so CSS can show a fallback instead of an empty box.
+  img.addEventListener('error', () => div.classList.add('art-picker-thumb--broken'));
   const lbl = document.createElement('div');
   lbl.className = 'art-picker-thumb-name';
   lbl.textContent = name;
