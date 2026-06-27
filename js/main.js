@@ -7,12 +7,12 @@ import './render/art-bg.js';       // registers art-background renderer
 import './render/cover.js';        // registers cover-card renderer
 
 import { list as listRenderers }  from './render/registry.js';
-import { WATERMARKS }              from './watermarks.js';
+import { getWatermarks, loadWatermarkSets } from './watermarks.js?v=2';
 import {
   extractCubeId, fetchCubeData, parseDecks,
   listCachedIds, parseManualDeck, parseDeckYaml,
 } from './cube-source.js?v=33';
-import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases } from './cards-ui.js?v=42';
+import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases } from './cards-ui.js?v=43';
 
 // ── DOM REFERENCES ────────────────────────────────────────────────────────────
 
@@ -54,9 +54,17 @@ function saveSettings(patch) {
 // ── WATERMARK DROPDOWN ────────────────────────────────────────────────────────
 
 const wmSelect = document.getElementById('watermark');
-wmSelect.innerHTML = Object.entries(WATERMARKS)
-  .map(([k, v]) => `<option value="${k}"${k === 'fdn' ? ' selected' : ''}>${v.label}</option>`)
-  .join('');
+function buildWatermarkOptions(selected = 'fdn') {
+  wmSelect.innerHTML = Object.entries(getWatermarks())
+    .map(([k, v]) => `<option value="${k}"${k === selected ? ' selected' : ''}>${v.label}</option>`)
+    .join('');
+  // If the desired value isn't present, fall back to the always-available auto option.
+  if (![...wmSelect.options].some(o => o.value === selected)) wmSelect.value = 'set-color';
+}
+buildWatermarkOptions();
+
+// Refresh the set list from Scryfall (cached); rebuild preserving the selection.
+loadWatermarkSets().then(() => buildWatermarkOptions(wmSelect.value));
 
 // ── STYLE DROPDOWN (B3) ───────────────────────────────────────────────────────
 

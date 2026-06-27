@@ -3,8 +3,8 @@
 // per-card watermark selector, single + batch PNG download, downsample helper.
 
 import { get as registryGet }  from './render/registry.js';
-import { buildDeckModel }      from './deck-model.js';
-import { WATERMARKS }          from './watermarks.js';
+import { buildDeckModel }      from './deck-model.js?v=2';
+import { getWatermarks }       from './watermarks.js?v=2';
 import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=33';
 import {
   clear as clearState, push as pushState,
@@ -588,7 +588,7 @@ function addCardOverlay(cell, index) {
   wmSel.className = 'card-wm-select';
   wmSel.title = 'Watermark';
   const currentWmKey = getState(index)?.wmKey ?? 'none';
-  for (const [k, v] of Object.entries(WATERMARKS)) {
+  for (const [k, v] of Object.entries(getWatermarks())) {
     const opt = document.createElement('option');
     opt.value = k; opt.textContent = v.label;
     if (k === currentWmKey) opt.selected = true;
