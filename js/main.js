@@ -11,8 +11,8 @@ import { getWatermarks, loadWatermarkSets } from './watermarks.js?v=2';
 import {
   extractCubeId, fetchCubeData, parseDecks,
   listCachedIds, parseManualDeck, parseDeckYaml,
-} from './cube-source.js?v=34';
-import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases } from './cards-ui.js?v=51';
+} from './cube-source.js?v=35';
+import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases } from './cards-ui.js?v=52';
 
 // ── DOM REFERENCES ────────────────────────────────────────────────────────────
 
@@ -273,9 +273,9 @@ importYamlInput.addEventListener('change', async () => {
   importYamlInput.value = '';        // allow re-importing the same file
   if (!file) return;
 
-  let decks;
+  let decks, settings;
   try {
-    decks = parseDeckYaml(await file.text());
+    ({ decks, settings } = parseDeckYaml(await file.text()));
   } catch (err) {
     setStatus(`Could not read YAML: ${err.message}`, 'error');
     return;
@@ -285,8 +285,10 @@ importYamlInput.addEventListener('change', async () => {
   applyPageSettings();
   setStatus(`Rendering ${decks.length} card${decks.length !== 1 ? 's' : ''}…`, 'loading');
   try {
+    // Per-deck settings from the YAML (watermark/style/art/etc.) win; any deck
+    // that left a field unset falls back to the current global selection.
     await renderDecks(decks, wmSelect.value, styleSelect.value,
-                      document.getElementById('artUrl').value.trim());
+                      document.getElementById('artUrl').value.trim(), settings);
     setStatus(`${decks.length} deck card${decks.length !== 1 ? 's' : ''} imported.`);
     printBtn.style.display      = '';
     downloadBtn.style.display   = '';

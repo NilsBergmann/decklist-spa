@@ -303,10 +303,25 @@ function yamlUnquote(v) {
   return v;
 }
 
-export function decksToYaml(decks) {
+// Entries are the full per-card app-state objects (state.js), not bare decks —
+// exporting just `.deck` would silently drop every manual setting (watermark,
+// style, art override/reposition, color override, blend) and each card's auto
+// `art` (needed for the "from this deck" art picker + auto art fallback).
+export function decksToYaml(entries) {
   const lines = ['# Decklist export', 'decks:'];
-  for (const deck of decks) {
+  for (const entry of entries) {
+    const { deck, wmKey, styleKey, artOverride, colorOverride, blendRatio, artTransform } = entry;
     lines.push(`  - name: ${yamlQuote(deck.name)}`);
+    if (wmKey)    lines.push(`    watermark: ${yamlQuote(wmKey)}`);
+    if (styleKey) lines.push(`    style: ${yamlQuote(styleKey)}`);
+    if (artOverride) lines.push(`    art: ${yamlQuote(artOverride)}`);
+    if (Array.isArray(colorOverride) && colorOverride.length) {
+      lines.push(`    colorOverride: ${yamlQuote(colorOverride.join(''))}`);
+    }
+    if (blendRatio != null) lines.push(`    blendRatio: ${yamlQuote(String(blendRatio))}`);
+    if (artTransform && (artTransform.x || artTransform.y || artTransform.zoom !== 1)) {
+      lines.push(`    artTransform: ${yamlQuote(`${artTransform.x},${artTransform.y},${artTransform.zoom}`)}`);
+    }
     lines.push('    cards:');
     const typeGroups = groupByType(deck.cards);
     for (const type of sortTypes(Object.keys(typeGroups))) {
@@ -318,15 +333,20 @@ export function decksToYaml(decks) {
         lines.push(`        rarity: ${yamlQuote(card.rarity)}`);
         lines.push(`        cost: ${yamlQuote(card.cost)}`);
         lines.push(`        colors: ${yamlQuote((card.colors ?? []).join(''))}`);
+        if (card.art) lines.push(`        art: ${yamlQuote(card.art)}`);
       }
     }
   }
   return lines.join('\n') + '\n';
 }
 
+// Returns { decks, settings } — settings[i] parallels decks[i] and carries
+// whatever per-deck fields the YAML specified (null when absent, meaning
+// "use the generator's current global selection", same as pre-D2 behavior).
 export function parseDeckYaml(text) {
   const decks = [];
-  let deck = null, card = null;
+  const settings = [];
+  let deck = null, deckSettings = null, card = null;
 
   const flush = () => {
     if (!deck || !card) { card = null; return; }
@@ -337,6 +357,7 @@ export function parseDeckYaml(text) {
       type:   card.type || 'Other',
       rarity: normalizeRarity((card.rarity ?? '').toLowerCase()),
       cost:   (card.cost ?? '').replace(/\s+/g, ''),
+      art:    card.art || null,
     };
     const n = Math.max(1, parseInt(card.count, 10) || 1);
     for (let i = 0; i < n; i++) deck.cards.push({ ...base, colors: [...colors] });
@@ -361,21 +382,57 @@ export function parseDeckYaml(text) {
       flush();
       deck = { name: yamlUnquote(val) || 'Deck', cards: [] };
       decks.push(deck);
+      deckSettings = {
+        wmKey: null, styleKey: null, artOverride: null,
+        colorOverride: null, blendRatio: null, artTransform: null,
+      };
+      settings.push(deckSettings);
       continue;
     }
+
+    // Deck-level settings sit between the deck's `name:` and its first card
+    // item — `!card` disambiguates them from the same-named card fields below.
+    if (!card && deckSettings) {
+      if (key === 'watermark') { deckSettings.wmKey = yamlUnquote(val); continue; }
+      if (key === 'style')     { deckSettings.styleKey = yamlUnquote(val); continue; }
+      if (key === 'art' && !isItem) { deckSettings.artOverride = yamlUnquote(val); continue; }
+      if (key === 'coloroverride') {
+        const letters = yamlUnquote(val).toUpperCase().split('').filter(c => WUBRG.includes(c) || c === 'C');
+        deckSettings.colorOverride = letters.length ? letters : null;
+        continue;
+      }
+      if (key === 'blendratio') {
+        const n = parseFloat(yamlUnquote(val));
+        deckSettings.blendRatio = Number.isFinite(n) ? n : null;
+        continue;
+      }
+      if (key === 'arttransform') {
+        const parts = yamlUnquote(val).split(',').map(Number);
+        if (parts.length === 3 && parts.every(Number.isFinite)) {
+          deckSettings.artTransform = { x: parts[0], y: parts[1], zoom: parts[2] };
+        }
+        continue;
+      }
+    }
+
     if (key === 'count') {
       flush();
       card = { count: yamlUnquote(val) };
       continue;
     }
-    if (card && ['name', 'type', 'rarity', 'cost', 'colors'].includes(key)) {
+    if (card && ['name', 'type', 'rarity', 'cost', 'colors', 'art'].includes(key)) {
       card[key] = yamlUnquote(val);
       continue;
     }
     if (!card && deck && key === 'name') deck.name = yamlUnquote(val);
   }
   flush();
-  return decks.filter(d => d.cards.length > 0);
+
+  const filteredDecks = [], filteredSettings = [];
+  decks.forEach((d, i) => {
+    if (d.cards.length > 0) { filteredDecks.push(d); filteredSettings.push(settings[i]); }
+  });
+  return { decks: filteredDecks, settings: filteredSettings };
 }
 
 // ── SCRYFALL ART SEARCH ───────────────────────────────────────────────────────

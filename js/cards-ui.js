@@ -5,7 +5,7 @@
 import { get as registryGet, list as registryList } from './render/registry.js';
 import { buildDeckModel }      from './deck-model.js?v=4';
 import { getWatermarks }       from './watermarks.js?v=2';
-import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=34';
+import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=35';
 import {
   clear as clearState, push as pushState,
   get as getState, update as updateState, getAll as getAllState,
@@ -83,13 +83,15 @@ export async function rerenderAll(patch) {
 
 // ── RENDER ALL DECKS ──────────────────────────────────────────────────────────
 
-export async function renderDecks(decks, wmKey, styleKey = 'm15', artOverride = '') {
+// perDeckSettings[i] (from a YAML import) can override wmKey/styleKey/
+// artOverride/colorOverride/blendRatio/artTransform for that one deck; any
+// field left null falls back to the generator's current global selection —
+// this is also how a plain Generate/manual-parse call (perDeckSettings
+// omitted) keeps applying one uniform setting to every deck, as before.
+export async function renderDecks(decks, wmKey, styleKey = 'm15', artOverride = '', perDeckSettings = null) {
   const grid = document.getElementById('cardGrid');
   grid.innerHTML = '';
   clearState();
-
-  // styleKey/artOverride are stored per-cell below; renderFullRes resolves the
-  // renderer from each cell's state, so no shared renderer ref is needed here.
 
   // Create all cells first so the DOM populates immediately.
   // Only the lightweight display canvas lives in the DOM during viewing;
@@ -102,7 +104,17 @@ export async function renderDecks(decks, wmKey, styleKey = 'm15', artOverride = 
     screenC.className = 'card card--screen';
     cell.appendChild(screenC);
 
-    pushState({ deck, wmKey, styleKey, artOverride, colorOverride: null, blendRatio: null, artTransform: { x: 0, y: 0, zoom: 1 }, model: null, cell });
+    const s = perDeckSettings?.[i] ?? {};
+    pushState({
+      deck,
+      wmKey:         s.wmKey ?? wmKey,
+      styleKey:      s.styleKey ?? styleKey,
+      artOverride:   s.artOverride ?? artOverride,
+      colorOverride: s.colorOverride ?? null,
+      blendRatio:    s.blendRatio ?? null,
+      artTransform:  s.artTransform ?? { x: 0, y: 0, zoom: 1 },
+      model: null, cell,
+    });
     addCardOverlay(cell, i);
     return cell;
   });
@@ -110,9 +122,9 @@ export async function renderDecks(decks, wmKey, styleKey = 'm15', artOverride = 
 
   // Render all cards concurrently, each into a throwaway full-res canvas.
   await Promise.all(decks.map(async (deck, i) => {
-    const resolvedArt = await resolveArtUrl(artOverride);
     const entry = getState(i);
-    updateState(i, { model: buildDeckModel(deck, wmKey, resolvedArt, { colorOverride: entry?.colorOverride, blendRatio: entry?.blendRatio, artTransform: entry?.artTransform }) });
+    const resolvedArt = await resolveArtUrl(entry.artOverride);
+    updateState(i, { model: buildDeckModel(deck, entry.wmKey, resolvedArt, { colorOverride: entry.colorOverride, blendRatio: entry.blendRatio, artTransform: entry.artTransform }) });
     const tmp = await renderFullRes(i);
     if (!tmp) return;
     downsample(tmp, cells[i].querySelector('.card--screen'));
@@ -155,9 +167,9 @@ export async function downloadAll() {
 
 // D1: export all current decks as a single YAML file
 export function downloadDecksYaml() {
-  const decks = getAllState().map(e => e.deck);
-  if (!decks.length) return;
-  const blob = new Blob([decksToYaml(decks)], { type: 'text/yaml' });
+  const entries = getAllState();
+  if (!entries.length) return;
+  const blob = new Blob([decksToYaml(entries)], { type: 'text/yaml' });
   const url  = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.download = 'decklist.yaml';
@@ -842,7 +854,11 @@ function openEdit(index) {
     artPickerSearchGrid.innerHTML = '';
     artPickerSearchStatus.textContent = '';
     populateDeckArtGrid(entry.deck);
-    resolveArtUrl(artVal).then(setArtPreview);
+    // The preview swatch should reflect what's actually in use right now: the
+    // manual override if set, otherwise the deck's auto-selected art (already
+    // resolved onto entry.model by the last render) — not a blank swatch just
+    // because artVal (the override field) is empty.
+    resolveArtUrl(artVal || entry.model?.artUrl || '').then(setArtPreview);
   }
 
   editingIndex = index;            // seedBlendSlider + preview read the current entry
