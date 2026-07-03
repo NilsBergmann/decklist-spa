@@ -896,6 +896,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeFullscreen();
     if (editModal.style.display !== 'none') closeEdit();
+    if (batchEditModal.style.display !== 'none') closeBatchEdit();
   }
 });
 
@@ -1070,3 +1071,84 @@ function reorderCards(from, to) {
   const grid = document.getElementById('cardGrid');
   grid.append(...getAllState().map(e => e.cell));   // re-append moves nodes in place
 }
+
+// ── BATCH TITLE/SUBTITLE EDIT ─────────────────────────────────────────────────
+// A table view to edit every card's title (and subtitle, per the "Title |
+// Subtitle" convention the cover style reads) at once, instead of one at a
+// time via double-click or the per-card edit modal. The modal is a full-
+// screen overlay, so state order can't shift underneath it — row index i
+// safely maps to getState(i) for the whole time it's open.
+
+const batchEditModal = document.getElementById('batchEditModal');
+const batchEditTbody = document.getElementById('batchEditTbody');
+
+function splitTitleSubtitle(name) {
+  const parts = (name ?? '').split('|');
+  return { title: parts[0].trim(), subtitle: parts.slice(1).join('|').trim() };
+}
+
+function buildBatchRow(entry) {
+  const { title, subtitle } = splitTitleSubtitle(entry.deck.name);
+  const row = document.createElement('tr');
+
+  const titleTd = document.createElement('td');
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.className = 'title-input';
+  titleInput.value = title;
+  titleTd.appendChild(titleInput);
+
+  const subTd = document.createElement('td');
+  const subInput = document.createElement('input');
+  subInput.type = 'text';
+  subInput.className = 'subtitle-input';
+  subInput.placeholder = 'Subtitle';
+  subInput.value = subtitle;
+  subTd.appendChild(subInput);
+
+  row.append(titleTd, subTd);
+  return row;
+}
+
+export function openBatchEdit() {
+  const entries = getAllState();
+  if (!entries.length) return;
+  batchEditTbody.innerHTML = '';
+  for (const entry of entries) batchEditTbody.appendChild(buildBatchRow(entry));
+  batchEditModal.style.display = 'flex';
+  batchEditTbody.querySelector('input')?.focus();
+}
+
+function closeBatchEdit() {
+  batchEditModal.style.display = 'none';
+}
+
+document.getElementById('batchEditClose').addEventListener('click', closeBatchEdit);
+document.getElementById('batchEditCancelBtn').addEventListener('click', closeBatchEdit);
+batchEditModal.addEventListener('click', e => { if (e.target === batchEditModal) closeBatchEdit(); });
+
+document.getElementById('batchEditSaveBtn').addEventListener('click', async () => {
+  const saveBtn = document.getElementById('batchEditSaveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Rendering…';
+  try {
+    const rows = [...batchEditTbody.children];
+    const toRender = [];
+    rows.forEach((row, i) => {
+      const entry = getState(i);
+      if (!entry) return;
+      const title    = row.querySelector('.title-input').value.trim() || 'Deck';
+      const subtitle = row.querySelector('.subtitle-input').value.trim();
+      const newName  = subtitle ? `${title} | ${subtitle}` : title;
+      if (newName !== entry.deck.name) {
+        updateState(i, { deck: { ...entry.deck, name: newName } });
+        toRender.push(i);
+      }
+    });
+    await Promise.all(toRender.map(i => renderOneCell(i)));
+    closeBatchEdit();
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Apply & Re-render';
+  }
+});

@@ -12,13 +12,14 @@ import {
   extractCubeId, fetchCubeData, parseDecks,
   listCachedIds, parseManualDeck, parseDeckYaml,
 } from './cube-source.js?v=35';
-import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases } from './cards-ui.js?v=53';
+import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases, openBatchEdit } from './cards-ui.js?v=54';
 
 // ── DOM REFERENCES ────────────────────────────────────────────────────────────
 
 const generateBtn    = document.getElementById('generateBtn');
 const printBtn       = document.getElementById('printBtn');
 const downloadBtn    = document.getElementById('downloadBtn');
+const batchEditBtn   = document.getElementById('batchEditBtn');
 const exportYamlBtn  = document.getElementById('exportYamlBtn');
 const importYamlBtn  = document.getElementById('importYamlBtn');
 const importYamlInput = document.getElementById('importYamlInput');
@@ -196,6 +197,7 @@ generateBtn.addEventListener('click', async () => {
 
   printBtn.style.display      = 'none';
   downloadBtn.style.display   = 'none';
+  batchEditBtn.style.display  = 'none';
   exportYamlBtn.style.display = 'none';
   setStatus('');
 
@@ -236,6 +238,7 @@ generateBtn.addEventListener('click', async () => {
     setStatus(`${decks.length} deck card${decks.length !== 1 ? 's' : ''} generated.`);
     printBtn.style.display      = '';
     downloadBtn.style.display   = '';
+    batchEditBtn.style.display  = '';
     exportYamlBtn.style.display = '';
   } catch (err) {
     setStatus(`Error: ${err.message}`, 'error');
@@ -261,6 +264,7 @@ printBtn.addEventListener('click', async () => {
 });
 
 downloadBtn.addEventListener('click', downloadAll);
+batchEditBtn.addEventListener('click', openBatchEdit);
 
 // ── DECK YAML IMPORT / EXPORT (D1) ─────────────────────────────────────────────
 
@@ -292,6 +296,7 @@ importYamlInput.addEventListener('change', async () => {
     setStatus(`${decks.length} deck card${decks.length !== 1 ? 's' : ''} imported.`);
     printBtn.style.display      = '';
     downloadBtn.style.display   = '';
+    batchEditBtn.style.display  = '';
     exportYamlBtn.style.display = '';
   } catch (err) {
     setStatus(`Error: ${err.message}`, 'error');
