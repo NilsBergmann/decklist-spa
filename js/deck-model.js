@@ -2,8 +2,8 @@
 // buildDeckModel returns a plain data object with NO renderer-specific fields:
 // no coords, no font names, no CC markup tokens.
 
-import { WUBRG, TYPE_ORDER, RARITY_ORDER, RARITY_HEX } from './config.js';
-import { resolveWatermark } from './watermarks.js?v=2';
+import { WUBRG, TYPE_ORDER, RARITY_ORDER, RARITY_HEX } from './config.js?v=2';
+import { resolveWatermark } from './watermarks.js?v=3';
 
 // ── PRIVATE HELPERS ──────────────────────────────────────────────────────────
 

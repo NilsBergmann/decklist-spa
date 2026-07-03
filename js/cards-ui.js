@@ -2,9 +2,9 @@
 // Owns: per-card cell creation, overlay buttons, fullscreen + edit modals,
 // per-card watermark selector, single + batch PNG download, downsample helper.
 
-import { get as registryGet, list as registryList } from './render/registry.js';
-import { buildDeckModel }      from './deck-model.js?v=4';
-import { getWatermarks }       from './watermarks.js?v=2';
+import { get as registryGet, list as registryList } from './render/registry.js?v=1';
+import { buildDeckModel }      from './deck-model.js?v=5';
+import { getWatermarks }       from './watermarks.js?v=3';
 import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=35';
 import {
   clear as clearState, push as pushState,

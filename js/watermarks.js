@@ -1,6 +1,6 @@
 // ── WATERMARKS + WATERMARK RESOLUTION ───────────────────────────────────────
 
-import { COLOR_HEX } from './config.js';
+import { COLOR_HEX } from './config.js?v=2';
 
 export const SF = code => `https://svgs.scryfall.io/sets/${code}.svg`;
 

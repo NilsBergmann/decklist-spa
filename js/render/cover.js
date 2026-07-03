@@ -4,10 +4,10 @@
 // -left, and mono+dual color pips bottom-right. Reproduces Card Conjurer's
 // `j22Front` template; ignores the deck's card list.
 
-import { register }            from './registry.js';
-import { loadImage, manaSrc, ensureFonts } from './assets.js';
-import { COLOR_HEX, GUILD_HYBRID }         from '../config.js';
-import { cutRoundedCorners }   from './canvas-util.js';
+import { register }            from './registry.js?v=1';
+import { loadImage, manaSrc, ensureFonts } from './assets.js?v=1';
+import { COLOR_HEX, GUILD_HYBRID }         from '../config.js?v=2';
+import { cutRoundedCorners }   from './canvas-util.js?v=1';
 
 const CC_W = 2010;
 const CC_H = 2814;

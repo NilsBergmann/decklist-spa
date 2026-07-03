@@ -3,7 +3,7 @@
 // Supports tokens: plain text, \n, {bold}/{/bold}, {fontcolor#hex},
 // {rightN} tab-stop, inline mana symbols {g}/{1}/…
 
-import { loadImage, manaSrc, MANA_CODES } from './assets.js';
+import { loadImage, manaSrc, MANA_CODES } from './assets.js?v=1';
 
 // ── FRACTIONAL-TO-PIXEL SCALE HELPERS ────────────────────────────────────────
 // Identical interface to CC's creator-23.js helpers.

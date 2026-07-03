@@ -3,12 +3,12 @@
 // bounds, pip position, corner radius.
 // Consumes the style-agnostic deck model and self-registers with the registry.
 
-import { register }          from './registry.js';
-import { loadImage, manaSrc, MANA_CODES, ensureFonts } from './assets.js';
-import { cutRoundedCorners } from './canvas-util.js';
-import { drawColorPips }     from './pips.js';
-import { buildTextMarkup }   from './markup.js';
-import { scaleX, scaleY, scaleWidth, scaleHeight, writeText } from './text.js';
+import { register }          from './registry.js?v=1';
+import { loadImage, manaSrc, MANA_CODES, ensureFonts } from './assets.js?v=1';
+import { cutRoundedCorners } from './canvas-util.js?v=1';
+import { drawColorPips }     from './pips.js?v=1';
+import { buildTextMarkup }   from './markup.js?v=1';
+import { scaleX, scaleY, scaleWidth, scaleHeight, writeText } from './text.js?v=1';
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
 
