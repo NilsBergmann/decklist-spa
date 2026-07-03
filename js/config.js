@@ -18,9 +18,11 @@ export const TYPE_ORDER = [
 
 export const RARITY_ORDER = ['common', 'uncommon', 'rare', 'mythic'];
 
-// A1: Z Token fix — extended set + forward-proof /^[YZ]\s/ guard
-export const IGNORED_TAGS_SET = new Set(['Token', 'Y Token', 'Z Theme', 'Z Token']);
-export const IGNORED_TAG_RE   = /^[YZ]\s/;
+// A1: Z Token fix — extended set + forward-proof /^[XYZ]\s/ guard.
+// X/Y/Z-prefixed tags are draft-archetype scratch packs, not real decks; "Other"
+// is Cubecobra's catch-all bucket for untagged cards — none should render as a card.
+export const IGNORED_TAGS_SET = new Set(['Token', 'Y Token', 'Z Theme', 'Z Token', 'Other']);
+export const IGNORED_TAG_RE   = /^[XYZ]\s/;
 
 // WUBRG-sorted two-color pair → available hybrid mana SVG code.
 export const GUILD_HYBRID = {
