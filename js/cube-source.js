@@ -3,7 +3,7 @@
 import {
   WUBRG, TYPE_ORDER, RARITY_ORDER,
   IGNORED_TAGS_SET, IGNORED_TAG_RE,
-} from './config.js';
+} from './config.js?v=2';
 
 // ── NORMALIZE RARITY ─────────────────────────────────────────────────────────
 
@@ -92,6 +92,40 @@ export function formatCost(parsedCost) {
     .join('');
 }
 
+// Mana value contributed by a single symbol, per the standard CMC rules:
+// X/Y/Z count as 0, generic and 2/color-hybrid count as their number, every
+// other symbol (colored, two-color hybrid, phyrexian, colorless) counts as 1.
+function manaValue(sym) {
+  const s = sym.toLowerCase().replace(/-/g, '');
+  if (s === 'x' || s === 'y' || s === 'z') return 0;
+  if (/^\d+$/.test(s)) return parseInt(s, 10);
+  if (/^\d[wubrg]$/.test(s)) return parseInt(s, 10);
+  return 1;
+}
+
+// Cubecobra's parsed_cost occasionally concatenates BOTH faces of a multi-part
+// card (seen on brand-new layouts, e.g. "prepare" cards, that its indexer
+// hasn't special-cased yet) instead of just the front face — e.g. Abigale,
+// Poet Laureate // Heroic Stanza ({1}{W}{B} // {1}{W/B}) comes back as
+// ["1","w","b","1","wb"] although its own cmc is 3, not 5.
+// A single real face's symbols always sum to the card's cmc, so if the raw
+// array overshoots that total, keep only the shortest leading prefix whose
+// value reaches it and drop the leaked remainder.
+export function sanitizeParsedCost(parsedCost, cmc) {
+  if (!Array.isArray(parsedCost) || typeof cmc !== 'number') return parsedCost;
+  const total = parsedCost.reduce((sum, sym) => sum + manaValue(sym), 0);
+  if (total <= cmc) return parsedCost;
+
+  const kept = [];
+  let running = 0;
+  for (const sym of parsedCost) {
+    if (running >= cmc) break;
+    kept.push(sym);
+    running += manaValue(sym);
+  }
+  return kept;
+}
+
 export function simplifyType(typeStr) {
   if (!typeStr) return 'Other';
   const base = typeStr.split(' — ')[0].replace(/^Legendary /, '').replace(/^Basic /, '');
@@ -127,7 +161,7 @@ export function parseDecks(data) {
         name:   d.name   ?? '',
         rarity: isBasic ? 'common' : normalizeRarity(d.rarity),
         type:   simplifyType(typeStr),
-        cost:   formatCost(d.parsed_cost),
+        cost:   formatCost(sanitizeParsedCost(d.parsed_cost, d.cmc)),
         colors: d.colors ?? [],
         art:    d.art_crop ?? d.image_normal ?? null,   // for art-background style
       };
