@@ -3,8 +3,8 @@
 // right-aligned row of mana SVGs in the title band.
 // 1-color: mono pip. 2-color: mono primary + guild hybrid. 3+: full WUBRG row.
 
-import { loadImage, manaSrc, MANA_CODES } from './assets.js';
-import { GUILD_HYBRID }                    from '../config.js';
+import { loadImage, manaSrc, MANA_CODES } from './assets.js?v=1';
+import { GUILD_HYBRID }                    from '../config.js?v=2';
 
 export async function drawColorPips(ctx, card, model) {
   const id = model.colorIdentity;

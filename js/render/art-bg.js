@@ -3,13 +3,13 @@
 // user-supplied URL, or a color-identity gradient fallback) → frosted glass panel
 // → title → color pips → rules text → rounded corners. No CC frame/watermark.
 
-import { register }            from './registry.js';
-import { loadImage, ensureFonts } from './assets.js';
-import { COLOR_HEX }           from '../config.js';
-import { cutRoundedCorners, roundRectPath } from './canvas-util.js';
-import { drawColorPips }       from './pips.js';
-import { buildTextMarkup }     from './markup.js';
-import { writeText }           from './text.js';
+import { register }            from './registry.js?v=1';
+import { loadImage, ensureFonts } from './assets.js?v=1';
+import { COLOR_HEX }           from '../config.js?v=2';
+import { cutRoundedCorners, roundRectPath } from './canvas-util.js?v=1';
+import { drawColorPips }       from './pips.js?v=1';
+import { buildTextMarkup }     from './markup.js?v=1';
+import { writeText }           from './text.js?v=1';
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
 

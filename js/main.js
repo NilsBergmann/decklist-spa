@@ -2,17 +2,17 @@
 // Wires the control panel; delegates rendering to cards-ui.js.
 // Side-effect import of m15.js registers the renderer before any render call.
 
-import './render/m15.js';          // registers m15 renderer
-import './render/art-bg.js';       // registers art-background renderer
-import './render/cover.js';        // registers cover-card renderer
+import './render/m15.js?v=1';          // registers m15 renderer
+import './render/art-bg.js?v=1';       // registers art-background renderer
+import './render/cover.js?v=1';        // registers cover-card renderer
 
-import { list as listRenderers }  from './render/registry.js';
-import { getWatermarks, loadWatermarkSets } from './watermarks.js?v=2';
+import { list as listRenderers }  from './render/registry.js?v=1';
+import { getWatermarks, loadWatermarkSets } from './watermarks.js?v=3';
 import {
   extractCubeId, fetchCubeData, parseDecks,
   listCachedIds, parseManualDeck, parseDeckYaml,
 } from './cube-source.js?v=35';
-import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases } from './cards-ui.js?v=52';
+import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases } from './cards-ui.js?v=53';
 
 // ── DOM REFERENCES ────────────────────────────────────────────────────────────
 
