@@ -1,8 +1,8 @@
 name: Deploy SPA to GitHub Pages
 
-# Publishes the static site (repo root) to GitHub Pages on every push to the
+# Publishes just the app's runtime files to GitHub Pages on every push to the
 # default branch. The app is plain HTML/CSS/ES-modules — no build step, just
-# upload the folder.
+# a curated copy of the folder (repo docs/config/fixtures are left out).
 
 on:
   push:
@@ -33,10 +33,18 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
+      # Stage only what the app actually loads at runtime — leaves out
+      # README.md, sample-cube.json, compose.yaml, .github/, .devcontainer/,
+      # .gitignore, etc.
+      - name: Stage app files
+        run: |
+          mkdir -p _site
+          cp -r index.html style.css js assets _site/
+
       - name: Upload site as Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
 
       - name: Deploy to GitHub Pages
         id: deployment
