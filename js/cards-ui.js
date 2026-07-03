@@ -354,6 +354,8 @@ function closeEdit() {
   editModal.style.display = 'none';
   _cardPreviewSeq++;                 // cancel any in-flight preview render
   clearTimeout(_cardPreviewTimer);
+  clearTimeout(_liveIdleTimer);
+  _liveSession = null;                // drop the cached live-drag model
   disposeCanvas(editPreviewCanvas);  // free the preview backing store
   restoreFocus();
 }
@@ -584,6 +586,7 @@ async function renderCardPreview() {
 }
 
 function scheduleCardPreview() {
+  _liveSession = null;   // field values changed — the cached live-drag model is stale
   clearTimeout(_cardPreviewTimer);
   _cardPreviewTimer = setTimeout(renderCardPreview, 300);
 }
@@ -606,6 +609,59 @@ function seedArtTransform(transform) {
   editArtZoom.value = String(_workingTransform.zoom);
 }
 
+// ── FAST LIVE PREVIEW FOR PAN/ZOOM ────────────────────────────────────────────
+// Routing every pointer move through the debounced buildPreviewModel pipeline
+// (re-parse deck text, re-resolve art URL, full-res render) feels laggy. During a
+// pan/zoom gesture we build the model + preload the art ONCE, then re-render
+// coalesced via requestAnimationFrame, mutating only artTransform. The cached
+// session expires shortly after the last move so later edits rebuild normally.
+let _liveSession = null;                 // { renderer, model } during a gesture
+let _liveBuilding = false;
+let _liveBusy = false, _liveDirty = false;
+let _liveIdleTimer = null;
+
+async function ensureLiveSession() {
+  if (_liveSession || _liveBuilding) return;
+  _liveBuilding = true;
+  try {
+    const built = await buildPreviewModel();
+    if (built) {
+      const renderer = registryGet(built.styleKey) ?? registryGet('m15');
+      await renderer.preload(built.model);
+      _liveSession = { renderer, model: built.model };
+    }
+  } finally { _liveBuilding = false; }
+  if (_liveSession) requestLiveFrame();
+}
+
+function requestLiveFrame() {
+  if (!_liveSession) return;
+  _liveDirty = true;
+  if (_liveBusy) return;                  // a frame is already in flight
+  _liveBusy = true;
+  requestAnimationFrame(runLiveFrame);
+}
+
+async function runLiveFrame() {
+  if (!_liveSession) { _liveBusy = false; return; }
+  _liveDirty = false;
+  _liveSession.model.artTransform = { ..._workingTransform };
+  const tmp = document.createElement('canvas');
+  try { await _liveSession.renderer.render(tmp, _liveSession.model); } catch {}
+  if (tmp.width) { downsample(tmp, editPreviewCanvas, P_W, P_H); disposeCanvas(tmp); }
+  // Coalesce: if more moves arrived mid-render, draw one more frame.
+  if (_liveSession && _liveDirty) requestAnimationFrame(runLiveFrame);
+  else _liveBusy = false;
+}
+
+// Immediate, coalesced preview update for a transform change (no 300ms debounce).
+function liveTransform() {
+  clearTimeout(_liveIdleTimer);
+  _liveIdleTimer = setTimeout(() => { _liveSession = null; }, 500);
+  if (_liveSession) requestLiveFrame();
+  else ensureLiveSession();
+}
+
 // Drag-to-pan: deltas are normalized by the on-screen canvas size so x/y stay in
 // roughly -1..1 regardless of the preview's rendered dimensions.
 let _panning = false, _panStartX = 0, _panStartY = 0, _panBaseX = 0, _panBaseY = 0;
@@ -617,6 +673,7 @@ editPreviewCanvas.addEventListener('mousedown', e => {
   _panStartX = e.clientX; _panStartY = e.clientY;
   _panBaseX = _workingTransform.x; _panBaseY = _workingTransform.y;
   editPreviewCanvas.classList.add('panning');
+  ensureLiveSession();                    // warm the cache for a smooth drag
 });
 
 window.addEventListener('mousemove', e => {
@@ -624,7 +681,7 @@ window.addEventListener('mousemove', e => {
   const rect = editPreviewCanvas.getBoundingClientRect();
   _workingTransform.x = _panBaseX + (e.clientX - _panStartX) / rect.width;
   _workingTransform.y = _panBaseY + (e.clientY - _panStartY) / rect.height;
-  scheduleCardPreview();
+  liveTransform();
 });
 
 window.addEventListener('mouseup', () => {
@@ -636,7 +693,7 @@ window.addEventListener('mouseup', () => {
 // Zoom: slider + mouse wheel (clamped ZOOM_MIN..ZOOM_MAX).
 editArtZoom.addEventListener('input', () => {
   _workingTransform.zoom = clampZoom(parseFloat(editArtZoom.value));
-  scheduleCardPreview();
+  liveTransform();
 });
 
 editPreviewCanvas.addEventListener('wheel', e => {
@@ -644,12 +701,12 @@ editPreviewCanvas.addEventListener('wheel', e => {
   e.preventDefault();
   _workingTransform.zoom = clampZoom(_workingTransform.zoom - e.deltaY * 0.001);
   editArtZoom.value = String(_workingTransform.zoom);
-  scheduleCardPreview();
+  liveTransform();
 }, { passive: false });
 
 editArtTransformReset.addEventListener('click', () => {
   seedArtTransform(DEFAULT_TRANSFORM);
-  scheduleCardPreview();
+  liveTransform();
 });
 
 // Every editable input that feeds buildPreviewModel re-renders the preview:
@@ -773,6 +830,7 @@ function openEdit(index) {
   editArtPicker.style.display   = hasArt ? '' : 'none';
   showArtTransformControls(hasArt);
   seedArtTransform(entry.artTransform);   // also resets working transform for non-art styles
+  _liveSession = null;                    // drop any cached model from a previously-edited card
   if (hasArt) {
     const artVal = entry.artOverride ?? '';
     editArtUrlInput.value = artVal;
