@@ -77,8 +77,9 @@
 
     <div class="actions">
       <button id="generateBtn">Generate</button>
-      <button id="printBtn"    class="secondary" style="display:none">Print / Save PDF</button>
-      <button id="downloadBtn" class="secondary" style="display:none">Download PNGs</button>
+      <button id="printBtn"     class="secondary" style="display:none">Print / Save PDF</button>
+      <button id="downloadBtn"  class="secondary" style="display:none">Download PNGs</button>
+      <button id="batchEditBtn" class="secondary" style="display:none">Edit Titles</button>
       <!-- D1: deck YAML import / export -->
       <button id="importYamlBtn" class="secondary">Import YAML</button>
       <button id="exportYamlBtn" class="secondary" style="display:none">Export YAML</button>
@@ -176,6 +177,28 @@
     </div>
   </div>
 
-  <script type="module" src="js/main.js?v=53"></script>
+  <!-- Batch title/subtitle edit -->
+  <div id="batchEditModal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true">
+    <div class="modal-box batch-edit-box">
+      <div class="modal-header">
+        <span class="modal-title">Edit titles</span>
+        <button class="modal-close-sm" id="batchEditClose" title="Close" aria-label="Close">✕</button>
+      </div>
+      <div class="batch-edit-body">
+        <table class="batch-edit-table">
+          <thead>
+            <tr><th>Title</th><th>Subtitle</th></tr>
+          </thead>
+          <tbody id="batchEditTbody"></tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button id="batchEditSaveBtn">Apply &amp; Re-render</button>
+        <button id="batchEditCancelBtn" class="secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js?v=54"></script>
 </body>
 </html>
