@@ -6,6 +6,7 @@ import { get as registryGet, list as registryList } from './render/registry.js?v
 import { buildDeckModel }      from './deck-model.js?v=5';
 import { getWatermarks }       from './watermarks.js?v=3';
 import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=35';
+import { splitTitleSubtitle }  from './text-utils.js?v=1';
 import {
   clear as clearState, push as pushState,
   get as getState, update as updateState, getAll as getAllState,
@@ -554,7 +555,7 @@ async function buildPreviewModel() {
 
   if (styleKey === 'cover') {
     const subtitle  = editSubtitleInput.value.trim();
-    const baseTitle = deck.name.split('|')[0].trim();
+    const baseTitle = splitTitleSubtitle(deck.name).title;
     deck.name = subtitle ? `${baseTitle} | ${subtitle}` : baseTitle;
   }
 
@@ -792,7 +793,7 @@ document.getElementById('editSaveBtn').addEventListener('click', async () => {
   // Merge subtitle back into deck name (cover style only)
   if (styleKey === 'cover') {
     const subtitle = editSubtitleInput.value.trim();
-    const baseTitle = deck.name.split('|')[0].trim();
+    const baseTitle = splitTitleSubtitle(deck.name).title;
     deck.name = subtitle ? `${baseTitle} | ${subtitle}` : baseTitle;
   }
 
@@ -832,8 +833,7 @@ function openEdit(index) {
   const isCover = styleKey === 'cover';
   editSubtitleGroup.style.display = isCover ? '' : 'none';
   if (isCover) {
-    const parts = (entry.deck.name ?? '').split('|');
-    editSubtitleInput.value = parts.slice(1).join('|').trim();
+    editSubtitleInput.value = splitTitleSubtitle(entry.deck.name).subtitle;
   }
 
   // Art URL + picker: art-bg and cover
@@ -913,7 +913,7 @@ function startInlineTitleEdit(cell) {
   if (!entry) return;
 
   const isCover = (entry.styleKey ?? 'm15') === 'cover';
-  const [rawTitle, ...rest] = (entry.deck.name ?? '').split('|');
+  const { title: rawTitle, subtitle: rawSubtitle } = splitTitleSubtitle(entry.deck.name);
 
   const box = document.createElement('div');
   box.className = 'inline-title-edit';
@@ -921,7 +921,7 @@ function startInlineTitleEdit(cell) {
   const titleInput = document.createElement('input');
   titleInput.type = 'text';
   titleInput.className = 'inline-title-input';
-  titleInput.value = rawTitle.trim();
+  titleInput.value = rawTitle;
   titleInput.setAttribute('aria-label', 'Card title');
   box.appendChild(titleInput);
 
@@ -931,7 +931,7 @@ function startInlineTitleEdit(cell) {
     subInput.type = 'text';
     subInput.className = 'inline-title-input';
     subInput.placeholder = 'Subtitle';
-    subInput.value = rest.join('|').trim();
+    subInput.value = rawSubtitle;
     subInput.setAttribute('aria-label', 'Card subtitle');
     box.appendChild(subInput);
   }
@@ -1082,11 +1082,6 @@ function reorderCards(from, to) {
 const batchEditModal = document.getElementById('batchEditModal');
 const batchEditTbody = document.getElementById('batchEditTbody');
 
-function splitTitleSubtitle(name) {
-  const parts = (name ?? '').split('|');
-  return { title: parts[0].trim(), subtitle: parts.slice(1).join('|').trim() };
-}
-
 function buildBatchRow(entry) {
   const { title, subtitle } = splitTitleSubtitle(entry.deck.name);
   const row = document.createElement('tr');
@@ -1113,6 +1108,7 @@ function buildBatchRow(entry) {
 export function openBatchEdit() {
   const entries = getAllState();
   if (!entries.length) return;
+  _returnFocus = document.activeElement;
   batchEditTbody.innerHTML = '';
   for (const entry of entries) batchEditTbody.appendChild(buildBatchRow(entry));
   batchEditModal.style.display = 'flex';
@@ -1121,11 +1117,13 @@ export function openBatchEdit() {
 
 function closeBatchEdit() {
   batchEditModal.style.display = 'none';
+  restoreFocus();
 }
 
 document.getElementById('batchEditClose').addEventListener('click', closeBatchEdit);
 document.getElementById('batchEditCancelBtn').addEventListener('click', closeBatchEdit);
 batchEditModal.addEventListener('click', e => { if (e.target === batchEditModal) closeBatchEdit(); });
+batchEditModal.addEventListener('keydown', e => trapFocus(batchEditModal, e));
 
 document.getElementById('batchEditSaveBtn').addEventListener('click', async () => {
   const saveBtn = document.getElementById('batchEditSaveBtn');
@@ -1134,19 +1132,29 @@ document.getElementById('batchEditSaveBtn').addEventListener('click', async () =
   try {
     const rows = [...batchEditTbody.children];
     const toRender = [];
+    const blanked = [];
     rows.forEach((row, i) => {
       const entry = getState(i);
       if (!entry) return;
-      const title    = row.querySelector('.title-input').value.trim() || 'Deck';
+      const title    = row.querySelector('.title-input').value.trim();
       const subtitle = row.querySelector('.subtitle-input').value.trim();
+      // Don't silently rename a blanked title to "Deck" — that can rewrite
+      // several cards at once from one accidental select-all-delete. Leave
+      // it unchanged and tell the user instead.
+      if (!title) { blanked.push(i + 1); return; }
       const newName  = subtitle ? `${title} | ${subtitle}` : title;
       if (newName !== entry.deck.name) {
         updateState(i, { deck: { ...entry.deck, name: newName } });
         toRender.push(i);
       }
     });
+    if (blanked.length) {
+      alert(`Row${blanked.length > 1 ? 's' : ''} ${blanked.join(', ')} left unchanged — title can't be blank.`);
+    }
     await Promise.all(toRender.map(i => renderOneCell(i)));
     closeBatchEdit();
+  } catch (err) {
+    alert(`Render error: ${err.message}`);
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = 'Apply & Re-render';

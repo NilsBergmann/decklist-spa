@@ -4,6 +4,7 @@
 
 import { WUBRG, TYPE_ORDER, RARITY_ORDER, RARITY_HEX } from './config.js?v=2';
 import { resolveWatermark } from './watermarks.js?v=3';
+import { splitTitleSubtitle } from './text-utils.js?v=1';
 
 // ── PRIVATE HELPERS ──────────────────────────────────────────────────────────
 
@@ -150,9 +151,7 @@ export function buildDeckModel(deck, wmKey, artOverride, opts = {}) {
   }
 
   // "Title | Subtitle" → split for the cover style; other styles use `name` only.
-  const [rawTitle, ...rest] = deck.name.split('|');
-  const title    = rawTitle.trim();
-  const subtitle = rest.join('|').trim();
+  const { title, subtitle } = splitTitleSubtitle(deck.name);
 
   return {
     name:           title,
