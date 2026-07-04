@@ -3,10 +3,11 @@
 // per-card watermark selector, single + batch PNG download, downsample helper.
 
 import { get as registryGet, list as registryList } from './render/registry.js?v=1';
-import { buildDeckModel }      from './deck-model.js?v=5';
+import { buildDeckModel }      from './deck-model.js?v=6';
 import { getWatermarks }       from './watermarks.js?v=3';
-import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=35';
-import { splitTitleSubtitle }  from './text-utils.js?v=1';
+import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=36';
+import { splitTitleSubtitle, mergeTitleSubtitle } from './text-utils.js?v=2';
+import { setStatus } from './status.js?v=1';
 import {
   clear as clearState, push as pushState,
   get as getState, update as updateState, getAll as getAllState,
@@ -82,6 +83,12 @@ export async function rerenderAll(patch) {
   }));
 }
 
+// Whether any cards have been generated yet (main.js uses this to decide
+// whether a global option change is destructive enough to confirm first).
+export function hasCards() {
+  return getAllState().length > 0;
+}
+
 // ── RENDER ALL DECKS ──────────────────────────────────────────────────────────
 
 // perDeckSettings[i] (from a YAML import) can override wmKey/styleKey/
@@ -148,7 +155,9 @@ function downloadCanvas(canvas, filename) {
 }
 
 async function downloadCell(index) {
-  const canvas = await renderFullRes(index);
+  let canvas;
+  try { canvas = await renderFullRes(index); }
+  catch (err) { setStatus(`Render error: ${err.message}`, 'error'); return; }
   if (!canvas) return;
   downloadCanvas(canvas, cardFileName(getState(index), index));
   disposeCanvas(canvas);
@@ -159,7 +168,9 @@ async function downloadCell(index) {
 export async function downloadAll() {
   const all = getAllState();
   for (let i = 0; i < all.length; i++) {
-    const canvas = await renderFullRes(i);
+    let canvas;
+    try { canvas = await renderFullRes(i); }
+    catch (err) { setStatus(`Render error on card ${i + 1}: ${err.message}`, 'error'); return; }
     if (!canvas) continue;
     downloadCanvas(canvas, cardFileName(all[i], i));
     disposeCanvas(canvas);
@@ -236,6 +247,13 @@ function restoreFocus() {
   _returnFocus = null;
 }
 
+// Non-blocking validation/error line inside a modal footer — replaces alert(),
+// which would otherwise sit behind the modal-overlay z-index and never be seen.
+function setModalStatus(el, msg, type = '') {
+  el.textContent = msg;
+  el.className   = 'modal-status' + (type ? ` ${type}` : '');
+}
+
 function closeFullscreen() {
   if (fullscreenModal.style.display === 'none') return;
   fullscreenModal.style.display = 'none';
@@ -251,7 +269,9 @@ fullscreenModal.addEventListener('keydown', e => trapFocus(fullscreenModal, e));
 
 async function openFullscreen(index) {
   _returnFocus = document.activeElement;
-  const src = await renderFullRes(index);
+  let src;
+  try { src = await renderFullRes(index); }
+  catch (err) { setStatus(`Render error: ${err.message}`, 'error'); return; }
   if (!src) return;
   fullscreenCanvas.width  = src.width;
   fullscreenCanvas.height = src.height;
@@ -264,6 +284,7 @@ async function openFullscreen(index) {
 // ── EDIT MODAL ────────────────────────────────────────────────────────────────
 
 const editModal           = document.getElementById('editModal');
+const editModalStatus     = document.getElementById('editModalStatus');
 const editTextarea        = document.getElementById('editTextarea');
 const editSubtitleGroup   = document.getElementById('editSubtitleGroup');
 const editSubtitleInput   = document.getElementById('editSubtitle');
@@ -288,6 +309,10 @@ const editArtTransformReset = document.getElementById('editArtTransformReset');
 let   editingIndex = -1;
 
 const MODAL_ART_STYLES = new Set(['art-bg', 'cover']);
+
+// Guards the one-off art-preview resolve in openEdit against a slow resolve
+// from a previously-opened card landing after a newer card is already open.
+let _artPreviewSeq = 0;
 
 // ── COLOR OVERRIDE (edit modal) ───────────────────────────────────────────────
 // Modal-local working copy of the per-card colorOverride: null = auto, otherwise
@@ -366,6 +391,7 @@ function closeEdit() {
   if (editModal.style.display === 'none') return;
   editModal.style.display = 'none';
   _cardPreviewSeq++;                 // cancel any in-flight preview render
+  _artPreviewSeq++;                  // cancel any in-flight art-swatch resolve
   clearTimeout(_cardPreviewTimer);
   clearTimeout(_liveIdleTimer);
   _liveSession = null;                // drop the cached live-drag model
@@ -556,7 +582,7 @@ async function buildPreviewModel() {
   if (styleKey === 'cover') {
     const subtitle  = editSubtitleInput.value.trim();
     const baseTitle = splitTitleSubtitle(deck.name).title;
-    deck.name = subtitle ? `${baseTitle} | ${subtitle}` : baseTitle;
+    deck.name = mergeTitleSubtitle(baseTitle, subtitle);
   }
 
   let artOverride = '';
@@ -776,8 +802,9 @@ document.getElementById('editSaveBtn').addEventListener('click', async () => {
   const text = editTextarea.value.trim();
   if (!text || editingIndex < 0) return;
 
+  setModalStatus(editModalStatus, '');
   const parsed = parseManualDeck(text);
-  if (!parsed.length) { alert('No cards found — check the format.'); return; }
+  if (!parsed.length) { setModalStatus(editModalStatus, 'No cards found — check the format.', 'error'); return; }
 
   const deck      = parsed[0];
   const entry     = getState(editingIndex);
@@ -794,7 +821,7 @@ document.getElementById('editSaveBtn').addEventListener('click', async () => {
   if (styleKey === 'cover') {
     const subtitle = editSubtitleInput.value.trim();
     const baseTitle = splitTitleSubtitle(deck.name).title;
-    deck.name = subtitle ? `${baseTitle} | ${subtitle}` : baseTitle;
+    deck.name = mergeTitleSubtitle(baseTitle, subtitle);
   }
 
   const patch = { deck, colorOverride: editColorOverride };
@@ -815,7 +842,7 @@ document.getElementById('editSaveBtn').addEventListener('click', async () => {
     await renderOneCell(editingIndex);
     closeEdit();
   } catch (err) {
-    alert(`Render error: ${err.message}`);
+    setModalStatus(editModalStatus, `Render error: ${err.message}`, 'error');
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = 'Re-render';
@@ -827,6 +854,7 @@ function openEdit(index) {
   if (!entry) return;
 
   _returnFocus = document.activeElement;
+  setModalStatus(editModalStatus, '');
   const styleKey = entry.styleKey ?? 'm15';
 
   // Subtitle: cover only — extract from the "Title | Subtitle" deck name
@@ -858,7 +886,10 @@ function openEdit(index) {
     // manual override if set, otherwise the deck's auto-selected art (already
     // resolved onto entry.model by the last render) — not a blank swatch just
     // because artVal (the override field) is empty.
-    resolveArtUrl(artVal || entry.model?.artUrl || '').then(setArtPreview);
+    const artPreviewSeq = ++_artPreviewSeq;
+    resolveArtUrl(artVal || entry.model?.artUrl || '').then(resolved => {
+      if (artPreviewSeq === _artPreviewSeq) setArtPreview(resolved);
+    });
   }
 
   editingIndex = index;            // seedBlendSlider + preview read the current entry
@@ -952,7 +983,7 @@ function startInlineTitleEdit(cell) {
     if (!e2) return;
     const title = titleInput.value.trim() || 'Deck';
     const sub   = subInput ? subInput.value.trim() : '';
-    const name  = (isCover && sub) ? `${title} | ${sub}` : title;
+    const name  = mergeTitleSubtitle(title, sub);
     updateState(idx, { deck: { ...e2.deck, name } });
     await renderOneCell(idx);
   };
@@ -989,11 +1020,15 @@ function addCardOverlay(cell, index) {
   // drag reorder (the captured `index` is only valid at creation time).
   const idxOf = () => indexOfCell(cell);
 
-  // Drag handle (reorder the card grid)
+  // Drag handle (reorder the card grid). Also keyboard-operable: focus the
+  // handle and press ←/→ to move the card, since dragstart/drop alone leave
+  // keyboard-only users with no way to reorder at all.
   const handle = document.createElement('div');
   handle.className = 'card-drag-handle';
-  handle.title = 'Drag to reorder';
-  handle.setAttribute('aria-label', 'Drag to reorder');
+  handle.title = 'Drag to reorder (or focus and press ← / →)';
+  handle.setAttribute('aria-label', 'Reorder card. Drag, or use left and right arrow keys.');
+  handle.setAttribute('role', 'button');
+  handle.tabIndex = 0;
   handle.textContent = '⠿';
   handle.draggable = true;
   handle.addEventListener('dragstart', e => {
@@ -1002,12 +1037,22 @@ function addCardOverlay(cell, index) {
     cell.classList.add('card-cell--dragging');
   });
   handle.addEventListener('dragend', () => cell.classList.remove('card-cell--dragging'));
+  handle.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const from = idxOf();
+    const to = from + (e.key === 'ArrowLeft' ? -1 : 1);
+    if (to < 0 || to >= getAllState().length) return;
+    reorderCards(from, to);
+    handle.focus();   // re-append during reorder can drop focus — restore it
+  });
   overlay.appendChild(handle);
 
   // Per-card style selector (overrides the global style for this card only)
   const styleSel = document.createElement('select');
   styleSel.className = 'card-wm-select card-style-select';
   styleSel.title = 'Style';
+  styleSel.setAttribute('aria-label', 'Style');
   const currentStyleKey = getState(index)?.styleKey ?? 'm15';
   for (const r of registryList()) {
     const opt = document.createElement('option');
@@ -1021,6 +1066,7 @@ function addCardOverlay(cell, index) {
   const wmSel = document.createElement('select');
   wmSel.className = 'card-wm-select';
   wmSel.title = 'Watermark';
+  wmSel.setAttribute('aria-label', 'Watermark');
   const currentWmKey = getState(index)?.wmKey ?? 'none';
   for (const [k, v] of Object.entries(getWatermarks())) {
     const opt = document.createElement('option');
@@ -1080,6 +1126,7 @@ function reorderCards(from, to) {
 // safely maps to getState(i) for the whole time it's open.
 
 const batchEditModal = document.getElementById('batchEditModal');
+const batchEditModalStatus = document.getElementById('batchEditModalStatus');
 const batchEditTbody = document.getElementById('batchEditTbody');
 
 function buildBatchRow(entry) {
@@ -1109,6 +1156,7 @@ export function openBatchEdit() {
   const entries = getAllState();
   if (!entries.length) return;
   _returnFocus = document.activeElement;
+  setModalStatus(batchEditModalStatus, '');
   batchEditTbody.innerHTML = '';
   for (const entry of entries) batchEditTbody.appendChild(buildBatchRow(entry));
   batchEditModal.style.display = 'flex';
@@ -1127,6 +1175,7 @@ batchEditModal.addEventListener('keydown', e => trapFocus(batchEditModal, e));
 
 document.getElementById('batchEditSaveBtn').addEventListener('click', async () => {
   const saveBtn = document.getElementById('batchEditSaveBtn');
+  setModalStatus(batchEditModalStatus, '');
   saveBtn.disabled = true;
   saveBtn.textContent = 'Rendering…';
   try {
@@ -1142,19 +1191,24 @@ document.getElementById('batchEditSaveBtn').addEventListener('click', async () =
       // several cards at once from one accidental select-all-delete. Leave
       // it unchanged and tell the user instead.
       if (!title) { blanked.push(i + 1); return; }
-      const newName  = subtitle ? `${title} | ${subtitle}` : title;
+      const newName  = mergeTitleSubtitle(title, subtitle);
       if (newName !== entry.deck.name) {
         updateState(i, { deck: { ...entry.deck, name: newName } });
         toRender.push(i);
       }
     });
-    if (blanked.length) {
-      alert(`Row${blanked.length > 1 ? 's' : ''} ${blanked.join(', ')} left unchanged — title can't be blank.`);
-    }
     await Promise.all(toRender.map(i => renderOneCell(i)));
-    closeBatchEdit();
+    if (blanked.length) {
+      // Leave the modal open so the message (and the still-blank rows) stay
+      // visible instead of vanishing the instant the modal closes.
+      setModalStatus(batchEditModalStatus,
+        `Row${blanked.length > 1 ? 's' : ''} ${blanked.join(', ')} left unchanged — title can't be blank.`,
+        'error');
+    } else {
+      closeBatchEdit();
+    }
   } catch (err) {
-    alert(`Render error: ${err.message}`);
+    setModalStatus(batchEditModalStatus, `Render error: ${err.message}`, 'error');
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = 'Apply & Re-render';

@@ -41,3 +41,18 @@ export function cutRoundedCorners(ctx, w, h) {
   }
   ctx.restore();
 }
+
+// Cover-fit an image into the box (bx, by, bw, bh) — scaled up to cover the
+// whole box (center-cropped), then panned/zoomed by `transform` ({ x, y, zoom },
+// x/y as fractions of the box size). Shared by every renderer that draws
+// user-supplied art (art-bg, cover) so pan/zoom feel stays identical across them.
+export function drawCoverFitImage(ctx, bx, by, bw, bh, img, transform) {
+  const t = transform ?? { x: 0, y: 0, zoom: 1 };
+  const scale = Math.max(bw / img.width, bh / img.height) * (t.zoom ?? 1);
+  const dw = img.width * scale, dh = img.height * scale;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  const dx = bx + (bw - dw) / 2 + (t.x ?? 0) * bw;
+  const dy = by + (bh - dh) / 2 + (t.y ?? 0) * bh;
+  ctx.drawImage(img, dx, dy, dw, dh);
+}

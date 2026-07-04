@@ -2,17 +2,18 @@
 // Wires the control panel; delegates rendering to cards-ui.js.
 // Side-effect import of m15.js registers the renderer before any render call.
 
-import './render/m15.js?v=1';          // registers m15 renderer
-import './render/art-bg.js?v=1';       // registers art-background renderer
-import './render/cover.js?v=1';        // registers cover-card renderer
+import './render/m15.js?v=2';          // registers m15 renderer
+import './render/art-bg.js?v=2';       // registers art-background renderer
+import './render/cover.js?v=2';        // registers cover-card renderer
 
 import { list as listRenderers }  from './render/registry.js?v=1';
 import { getWatermarks, loadWatermarkSets } from './watermarks.js?v=3';
 import {
   extractCubeId, fetchCubeData, parseDecks,
   listCachedIds, parseManualDeck, parseDeckYaml,
-} from './cube-source.js?v=35';
-import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases, openBatchEdit } from './cards-ui.js?v=54';
+} from './cube-source.js?v=36';
+import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases, openBatchEdit, hasCards } from './cards-ui.js?v=55';
+import { setStatus } from './status.js?v=1';
 
 // ── DOM REFERENCES ────────────────────────────────────────────────────────────
 
@@ -23,17 +24,9 @@ const batchEditBtn   = document.getElementById('batchEditBtn');
 const exportYamlBtn  = document.getElementById('exportYamlBtn');
 const importYamlBtn  = document.getElementById('importYamlBtn');
 const importYamlInput = document.getElementById('importYamlInput');
-const statusEl       = document.getElementById('status');
 const cacheSelect    = document.getElementById('cacheSelect');
 const cacheLoadBtn   = document.getElementById('cacheLoadBtn');
 const cacheDeleteBtn = document.getElementById('cacheDeleteBtn');
-
-// ── STATUS HELPER ─────────────────────────────────────────────────────────────
-
-function setStatus(msg, type = '') {
-  statusEl.textContent = msg;
-  statusEl.className   = type;
-}
 
 // ── SETTINGS PERSISTENCE ──────────────────────────────────────────────────────
 // Remember the user's style / watermark / page-size / crop-marks choices across
@@ -82,13 +75,35 @@ function queueRerender(patch) {
   renderChain = renderChain.then(() => rerenderAll(patch)).catch(() => {});
 }
 
+// Changing style/watermark after cards exist overwrites every card's current
+// look (including per-card overrides) with no undo — confirm before applying,
+// reverting the dropdown if the user backs out. The pre-change value is
+// captured on focus (right before the user opens the dropdown), so it stays
+// correct across programmatic value changes (restoreSettings, loadWatermarkSets)
+// without needing to be manually re-synced after each of them.
+let styleValueBeforeFocus = styleSelect.value;
+let wmValueBeforeFocus    = wmSelect.value;
+styleSelect.addEventListener('focus', () => { styleValueBeforeFocus = styleSelect.value; });
+wmSelect.addEventListener('focus',    () => { wmValueBeforeFocus    = wmSelect.value; });
+
+function confirmDestructiveChange(select, previousValue, label) {
+  if (!hasCards()) return true;
+  if (confirm(`Change ${label} for every generated card? This can't be undone.`)) return true;
+  select.value = previousValue;
+  return false;
+}
+
 const ART_STYLES = new Set(['art-bg', 'cover']);
 styleSelect.addEventListener('change', () => {
+  if (!confirmDestructiveChange(styleSelect, styleValueBeforeFocus, 'the style')) return;
+  styleValueBeforeFocus = styleSelect.value;
   artUrlGroup.style.display = ART_STYLES.has(styleSelect.value) ? '' : 'none';
   saveSettings({ style: styleSelect.value });
   queueRerender({ styleKey: styleSelect.value });
 });
 wmSelect.addEventListener('change', () => {
+  if (!confirmDestructiveChange(wmSelect, wmValueBeforeFocus, 'the watermark')) return;
+  wmValueBeforeFocus = wmSelect.value;
   saveSettings({ watermark: wmSelect.value });
   queueRerender({ wmKey: wmSelect.value });
 });
@@ -127,6 +142,7 @@ cacheSelect.addEventListener('change', loadCacheSelection);
 cacheDeleteBtn.addEventListener('click', () => {
   const id = cacheSelect.value;
   if (!id) return;
+  if (!confirm(`Remove the cached cube "${id}"? This can't be undone.`)) return;
   localStorage.removeItem(`cube:${id}`);
   refreshCacheDropdown();
   setStatus(`Removed cache for "${id}".`);

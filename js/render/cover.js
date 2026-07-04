@@ -7,7 +7,7 @@
 import { register }            from './registry.js?v=1';
 import { loadImage, manaSrc, ensureFonts } from './assets.js?v=1';
 import { COLOR_HEX, GUILD_HYBRID }         from '../config.js?v=2';
-import { cutRoundedCorners }   from './canvas-util.js?v=1';
+import { cutRoundedCorners, drawCoverFitImage } from './canvas-util.js?v=2';
 
 const CC_W = 2010;
 const CC_H = 2814;
@@ -30,16 +30,10 @@ async function drawCoverArt(ctx, w, h, model) {
   ctx.clip();
   if (model.artUrl) {
     try {
+      // art_crop is low-res (~626px) and gets upscaled — drawCoverFitImage
+      // resamples at high quality.
       const img = await loadImage(model.artUrl);
-      const t = model.artTransform ?? { x: 0, y: 0, zoom: 1 };
-      const scale = Math.max(bw / img.width, bh / img.height) * (t.zoom ?? 1);
-      const dw = img.width * scale, dh = img.height * scale;
-      // art_crop is low-res (~626px) and gets upscaled — resample at high quality.
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      const dx = bx + (bw - dw) / 2 + (t.x ?? 0) * bw;
-      const dy = by + (bh - dh) / 2 + (t.y ?? 0) * bh;
-      ctx.drawImage(img, dx, dy, dw, dh);
+      drawCoverFitImage(ctx, bx, by, bw, bh, img, model.artTransform);
       ctx.restore();
       return;
     } catch { /* CORS / 404 → gradient fallback */ }
