@@ -528,10 +528,18 @@ button.danger:active         { background: #b91c1c; }
 
 .modal-footer {
   display: flex;
+  align-items: center;
   gap: 10px;
   padding: 12px 18px;
   border-top: 1px solid #383838;
 }
+
+.modal-status {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.modal-status.error { color: #f87171; }
 
 /* Batch title/subtitle edit — a narrower modal, table body scrolls */
 .batch-edit-box { width: min(680px, 96vw); }

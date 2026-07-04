@@ -5,7 +5,7 @@
 
 import { register }          from './registry.js?v=1';
 import { loadImage, manaSrc, MANA_CODES, ensureFonts } from './assets.js?v=1';
-import { cutRoundedCorners } from './canvas-util.js?v=1';
+import { cutRoundedCorners } from './canvas-util.js?v=2';
 import { drawColorPips }     from './pips.js?v=1';
 import { buildTextMarkup }   from './markup.js?v=1';
 import { scaleX, scaleY, scaleWidth, scaleHeight, writeText } from './text.js?v=1';

@@ -85,7 +85,7 @@
       <button id="exportYamlBtn" class="secondary" style="display:none">Export YAML</button>
       <input id="importYamlInput" type="file" accept=".yaml,.yml,.txt" style="display:none">
     </div>
-    <div id="status"></div>
+    <div id="status" role="status" aria-live="polite"></div>
   </div>
 
   <div id="cardGrid"></div>
@@ -138,7 +138,7 @@
               <div class="art-picker-search-row">
                 <input id="artPickerSearch" type="text" placeholder="Card name… (press Enter to search)" autocomplete="off">
               </div>
-              <div id="artPickerSearchStatus" class="art-picker-status"></div>
+              <div id="artPickerSearchStatus" class="art-picker-status" role="status" aria-live="polite"></div>
               <div id="artPickerSearchGrid" class="art-picker-grid"></div>
             </div>
           </div>
@@ -171,6 +171,7 @@
         </div>
       </div>
       <div class="modal-footer">
+        <div id="editModalStatus" class="modal-status" role="status" aria-live="polite"></div>
         <button id="editSaveBtn">Re-render</button>
         <button id="editCancelBtn" class="secondary">Cancel</button>
       </div>
@@ -193,12 +194,13 @@
         </table>
       </div>
       <div class="modal-footer">
+        <div id="batchEditModalStatus" class="modal-status" role="status" aria-live="polite"></div>
         <button id="batchEditSaveBtn">Apply &amp; Re-render</button>
         <button id="batchEditCancelBtn" class="secondary">Cancel</button>
       </div>
     </div>
   </div>
 
-  <script type="module" src="js/main.js?v=54"></script>
+  <script type="module" src="js/main.js?v=55"></script>
 </body>
 </html>

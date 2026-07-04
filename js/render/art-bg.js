@@ -6,7 +6,7 @@
 import { register }            from './registry.js?v=1';
 import { loadImage, ensureFonts } from './assets.js?v=1';
 import { COLOR_HEX }           from '../config.js?v=2';
-import { cutRoundedCorners, roundRectPath } from './canvas-util.js?v=1';
+import { cutRoundedCorners, roundRectPath, drawCoverFitImage } from './canvas-util.js?v=2';
 import { drawColorPips }       from './pips.js?v=1';
 import { buildTextMarkup }     from './markup.js?v=1';
 import { writeText }           from './text.js?v=1';
@@ -49,20 +49,6 @@ function colorGradient(ctx, x0, x1, model) {
 
 // ── DRAW BACKGROUND ────────────────────────────────────────────────────────────
 
-// Cover-fit the art image (center-cropped) over the whole canvas.
-// Scryfall art_crop is only ~626px wide, so it's upscaled heavily here — use
-// high-quality resampling so it reads smoother rather than blocky.
-function drawArtImage(ctx, w, h, img, transform) {
-  const t = transform ?? { x: 0, y: 0, zoom: 1 };
-  const scale = Math.max(w / img.width, h / img.height) * (t.zoom ?? 1);
-  const dw = img.width * scale, dh = img.height * scale;
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  const dx = (w - dw) / 2 + (t.x ?? 0) * w;
-  const dy = (h - dh) / 2 + (t.y ?? 0) * h;
-  ctx.drawImage(img, dx, dy, dw, dh);
-}
-
 // Soft diagonal gradient built from the deck's color identity.
 function drawGradient(ctx, w, h, model) {
   const hexes = model.colorIdentity.map(c => COLOR_HEX[c] ?? COLOR_HEX.C);
@@ -80,7 +66,7 @@ function drawGradient(ctx, w, h, model) {
 async function drawArtBackground(ctx, w, h, model) {
   if (model.artUrl) {
     try {
-      drawArtImage(ctx, w, h, await loadImage(model.artUrl), model.artTransform);
+      drawCoverFitImage(ctx, 0, 0, w, h, await loadImage(model.artUrl), model.artTransform);
       return;
     } catch { /* CORS / 404 → fall through to gradient */ }
   }

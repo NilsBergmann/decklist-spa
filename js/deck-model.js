@@ -2,28 +2,12 @@
 // buildDeckModel returns a plain data object with NO renderer-specific fields:
 // no coords, no font names, no CC markup tokens.
 
-import { WUBRG, TYPE_ORDER, RARITY_ORDER, RARITY_HEX } from './config.js?v=2';
+import { WUBRG, RARITY_ORDER, RARITY_HEX } from './config.js?v=2';
 import { resolveWatermark } from './watermarks.js?v=3';
-import { splitTitleSubtitle } from './text-utils.js?v=1';
+import { splitTitleSubtitle } from './text-utils.js?v=2';
+import { groupByType, groupDuplicates, sortTypes } from './card-utils.js?v=1';
 
 // ── PRIVATE HELPERS ──────────────────────────────────────────────────────────
-
-function groupByType(cards) {
-  const g = {};
-  for (const c of cards) (g[c.type] ??= []).push(c);
-  return g;
-}
-
-function groupDuplicates(cards) {
-  const map = {};
-  for (const c of cards) {
-    if (map[c.name]) map[c.name].count++;
-    else map[c.name] = { card: c, count: 1 };
-  }
-  return Object.values(map).sort(
-    (a, b) => RARITY_ORDER.indexOf(a.card.rarity) - RARITY_ORDER.indexOf(b.card.rarity),
-  );
-}
 
 function collectManaCodes(deck) {
   const codes = new Set();
@@ -49,7 +33,10 @@ export function deckColors(deck) {
 // Primary = most common color (by card count), secondary = second most.
 // Returns { primary: 'W'|'U'|…|'M'|'C', secondary: same }
 export function primarySecondary(deck) {
-  const sorted = Object.entries(deckColors(deck)).sort((a, b) => b[1] - a[1]);
+  // Tie-break by WUBRG order (not card-list order) so reordering the deck's
+  // card lines can't flip which equally-common color is "primary".
+  const sorted = Object.entries(deckColors(deck)).sort((a, b) =>
+    b[1] - a[1] || WUBRG.indexOf(a[0]) - WUBRG.indexOf(b[0]));
   if (sorted.length === 0) return { primary: 'C', secondary: 'C' };
   if (sorted.length === 1) return { primary: sorted[0][0], secondary: sorted[0][0] };
   if (sorted.length === 2) return { primary: sorted[0][0], secondary: sorted[1][0] };
@@ -128,10 +115,7 @@ export function buildDeckModel(deck, wmKey, artOverride, opts = {}) {
 
   // Build sections (type groups ordered by TYPE_ORDER, 'Other' excluded)
   const typeGroups  = groupByType(deck.cards);
-  const sortedTypes = Object.keys(typeGroups).sort((a, b) => {
-    const ai = TYPE_ORDER.indexOf(a), bi = TYPE_ORDER.indexOf(b);
-    return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
-  });
+  const sortedTypes = sortTypes(Object.keys(typeGroups));
 
   const sections = [];
   for (const type of sortedTypes) {

@@ -1,9 +1,10 @@
 // ── CUBECOBRA FETCH, CACHE, PARSE + MANUAL DECK FORMAT ──────────────────────
 
 import {
-  WUBRG, TYPE_ORDER, RARITY_ORDER,
+  WUBRG, RARITY_ORDER,
   IGNORED_TAGS_SET, IGNORED_TAG_RE,
 } from './config.js?v=2';
+import { groupByType, groupDuplicates, sortTypes } from './card-utils.js?v=1';
 
 // ── NORMALIZE RARITY ─────────────────────────────────────────────────────────
 
@@ -243,30 +244,10 @@ export function parseManualDeck(text) {
 
 // ── DECK → MANUAL TEXT (for edit modal) ─────────────────────────────────────
 
-function groupByType(cards) {
-  const g = {};
-  for (const c of cards) (g[c.type] ??= []).push(c);
-  return g;
-}
-
-function groupDuplicates(cards) {
-  const map = {};
-  for (const c of cards) {
-    if (map[c.name]) map[c.name].count++;
-    else map[c.name] = { card: c, count: 1 };
-  }
-  return Object.values(map).sort(
-    (a, b) => RARITY_ORDER.indexOf(a.card.rarity) - RARITY_ORDER.indexOf(b.card.rarity),
-  );
-}
-
 export function deckToManualText(deck) {
   const lines = [`# ${deck.name}`];
   const typeGroups = groupByType(deck.cards);
-  const sortedTypes = Object.keys(typeGroups).sort((a, b) => {
-    const ai = TYPE_ORDER.indexOf(a), bi = TYPE_ORDER.indexOf(b);
-    return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
-  });
+  const sortedTypes = sortTypes(Object.keys(typeGroups));
   for (const type of sortedTypes) {
     if (type === 'Other') continue;
     lines.push(type);
@@ -282,13 +263,6 @@ export function deckToManualText(deck) {
 // ── DECK YAML (D1: export / import) ─────────────────────────────────────────
 // A small, self-contained YAML subset — we own both ends, so no parser library.
 // Cards are stored compactly (count + fields); duplicates expand on import.
-
-function sortTypes(types) {
-  return [...types].sort((a, b) => {
-    const ai = TYPE_ORDER.indexOf(a), bi = TYPE_ORDER.indexOf(b);
-    return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
-  });
-}
 
 function yamlQuote(s) {
   return `"${String(s ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
