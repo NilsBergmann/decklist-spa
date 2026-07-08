@@ -9,8 +9,11 @@ export function buildTextMarkup(model) {
     lines.push(`{bold}${section.type} (${section.total}){/bold}`);
     for (const row of section.rows) {
       // {rightN}: absolute tab-stop at N×fontSize/100 px from text-box left.
-      // Diamond always at {right130}; count prefix sits at {right5}.
-      const prefix = row.count > 1 ? `{right5}${row.count}x{right130}` : `{right130}`;
+      // Single-copy rows tab the diamond in from the left margin at {right95}.
+      // Multi-copy rows flow the diamond right after the "Nx " count prefix
+      // instead of a fixed tab-stop, so a wide (2-digit+) count never collides
+      // with it.
+      const prefix = row.count > 1 ? `{right5}${row.count}x ` : `{right95}`;
       lines.push(`${prefix}{fontcolor${row.rarityHex}}◆ {fontcolor#000000}${row.name} ${row.cost}`);
     }
   }
