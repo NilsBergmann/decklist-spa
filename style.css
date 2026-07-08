@@ -609,8 +609,9 @@ button.danger:active         { background: #b91c1c; }
 .art-reset-btn:active { background: #4a4a4a; }
 
 /* color override toggles: Auto + WUBRG + C swatch buttons */
-.color-toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+.color-toggles { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .color-toggle {
+  position: relative;
   width: 30px;
   height: 30px;
   padding: 0;
@@ -623,6 +624,24 @@ button.danger:active         { background: #b91c1c; }
   border-radius: 50%;
   cursor: pointer;
 }
+/* Order badge (1st/2nd) shown on the two active swatches of a manual 2-color
+   override, so the ability to reorder them (via editColorSwap) is visible. */
+.color-toggle[data-order]::after {
+  content: attr(data-order);
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  color: #111;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+}
+.color-swap-btn { width: auto; padding: 0 10px; font-size: 15px; }
 .color-toggle--auto {
   width: auto;
   padding: 0 12px;
