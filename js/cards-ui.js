@@ -300,6 +300,7 @@ const artPickerSearchGrid = document.getElementById('artPickerSearchGrid');
 const artPickerSearchStatus = document.getElementById('artPickerSearchStatus');
 const editPreviewCanvas   = document.getElementById('editPreviewCanvas');
 const editColorToggles    = document.getElementById('editColorToggles');
+const editColorSwap       = document.getElementById('editColorSwap');
 const editBlendGroup      = document.getElementById('editBlendGroup');
 const editBlendSlider     = document.getElementById('editBlendSlider');
 const editBlendValue      = document.getElementById('editBlendValue');
@@ -316,40 +317,79 @@ let _artPreviewSeq = 0;
 
 // ── COLOR OVERRIDE (edit modal) ───────────────────────────────────────────────
 // Modal-local working copy of the per-card colorOverride: null = auto, otherwise
-// an array of letters from W/U/B/R/G (or ['C'] for colorless). Seeded in
-// openEdit, mutated by the toggle buttons, persisted on save.
+// an array of letters from W/U/B/R/G (or including 'C' for a colorless blend,
+// e.g. ['C','W']), IN CLICK ORDER — order is significant: buildDeckModel reads
+// override[0]/[1] as primary/secondary, so ['W','B'] and ['B','W'] pick
+// opposite frame/watermark sides for the same WB identity. Seeded in openEdit,
+// mutated by the toggle buttons and the swap button, persisted on save.
 let editColorOverride = null;
 
-// Sync the toggle buttons' pressed state to editColorOverride.
+// Sync the toggle buttons' pressed state (and order badge) to editColorOverride.
 function syncColorToggles() {
   const active = new Set(editColorOverride ?? []);
+  const showOrder = (editColorOverride ?? []).length === 2;
   for (const btn of editColorToggles.querySelectorAll('.color-toggle')) {
     const on = btn.dataset.color === 'auto'
       ? editColorOverride === null
       : active.has(btn.dataset.color);
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-pressed', String(on));
+    if (showOrder && on && btn.dataset.color !== 'auto') {
+      btn.dataset.order = String(editColorOverride.indexOf(btn.dataset.color) + 1);
+    } else {
+      delete btn.dataset.order;
+    }
   }
+  editColorSwap.style.display = showOrder ? '' : 'none';
 }
 
-// Toggle one color letter (or reset to auto). 'C' is mutually exclusive with the
-// WUBRG letters. Selecting nothing collapses back to auto (null).
+// Toggle one color letter (or reset to auto). 'C' combines with at most one
+// other WUBRG letter (a colorless blend, e.g. ['C','W']); a third color drops
+// 'C' since 3+ colors always collapse to a single gold frame anyway. Selecting
+// nothing collapses back to auto (null).
 function toggleColor(color) {
   if (color === 'auto') { editColorOverride = null; return; }
   let cur = editColorOverride ? [...editColorOverride] : [];
   if (color === 'C') {
-    cur = cur.includes('C') ? [] : ['C'];
+    if (cur.includes('C'))    cur = cur.filter(c => c !== 'C');
+    else if (cur.length <= 1) cur = [...cur, 'C'];
+    else                      cur = ['C'];
+  } else if (cur.includes(color)) {
+    cur = cur.filter(c => c !== color);
   } else {
-    cur = cur.filter(c => c !== 'C');
-    cur = cur.includes(color) ? cur.filter(c => c !== color) : [...cur, color];
+    const wubrgCount = cur.filter(c => c !== 'C').length;
+    cur = (wubrgCount >= 1 && cur.includes('C'))
+      ? [...cur.filter(c => c !== 'C'), color]   // 2nd WUBRG color alongside C drops C
+      : [...cur, color];
   }
   editColorOverride = cur.length ? cur : null;
+}
+
+// Colors selected right now, for gating the blend slider: the override's own
+// length when manual, otherwise the deck's last-known auto-detected count.
+function currentColorCount(entry) {
+  if (editColorOverride) return editColorOverride.length;
+  return entry?.model?.colorIdentity?.length ?? 0;
+}
+
+function updateBlendVisibility(styleKey, colorCount) {
+  editBlendGroup.style.display =
+    MODAL_BLEND_STYLES.has(styleKey) && colorCount === 2 ? '' : 'none';
 }
 
 editColorToggles.addEventListener('click', e => {
   const btn = e.target.closest('.color-toggle');
   if (!btn) return;
   toggleColor(btn.dataset.color);
+  syncColorToggles();
+  const entry = getState(editingIndex);
+  if (entry) updateBlendVisibility(entry.styleKey ?? 'm15', currentColorCount(entry));
+  scheduleCardPreview();
+});
+
+editColorSwap.addEventListener('click', () => {
+  if (!editColorOverride || editColorOverride.length !== 2) return;
+  editColorOverride = [editColorOverride[1], editColorOverride[0]];
   syncColorToggles();
   scheduleCardPreview();
 });
@@ -607,6 +647,11 @@ async function renderCardPreview() {
   let built;
   try { built = await buildPreviewModel(); } catch { return; }
   if (!built || seq !== _cardPreviewSeq) return;   // bad input or superseded
+
+  // Deck-text edits can change the auto-detected color count (colorOverride
+  // null) without a toggle click, so re-sync the blend slider's visibility
+  // here too — the toggle handler already does this synchronously for clicks.
+  updateBlendVisibility(built.styleKey, built.model.colorIdentity.length);
 
   const renderer = registryGet(built.styleKey) ?? registryGet('m15');
   const tmp = document.createElement('canvas');
@@ -900,10 +945,11 @@ function openEdit(index) {
     : null;
   syncColorToggles();
 
-  // Blend slider: m15 only. Seed from the saved override, or the deck's
-  // computed auto split when there's none.
-  const hasBlend = MODAL_BLEND_STYLES.has(styleKey);
-  editBlendGroup.style.display = hasBlend ? '' : 'none';
+  // Blend slider: m15 only, and only meaningful for an exactly-two-color pack.
+  // Seed from the saved override, or the deck's computed auto split when
+  // there's none.
+  updateBlendVisibility(styleKey, currentColorCount(entry));
+  const hasBlend = editBlendGroup.style.display !== 'none';
   if (hasBlend) {
     _blendAuto = entry.blendRatio == null;
     if (_blendAuto) {

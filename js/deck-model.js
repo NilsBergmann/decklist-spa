@@ -69,12 +69,12 @@ export function deckArtUrl(deck) {
 
 // ── BUILD MODEL ──────────────────────────────────────────────────────────────
 
-// Derive { primary, secondary } from an explicit WUBRG-sorted color list, the
-// same way primarySecondary derives them from pip counts:
+// Derive { primary, secondary } from a color list IN THE ORDER GIVEN (a manual
+// override preserves the user's click order — e.g. ['B','W'] vs ['W','B'] —
+// so they can flip which color leads a two-color blend):
 //   length 1 → primary=secondary=that color
 //   length 2 → primary=first, secondary=second
 //   length ≥3 → primary=secondary='M'
-//   ['C']    → 'C'
 function primarySecondaryFromColors(colors) {
   if (colors.length === 1) return { primary: colors[0], secondary: colors[0] };
   if (colors.length === 2) return { primary: colors[0], secondary: colors[1] };
@@ -88,10 +88,15 @@ export function buildDeckModel(deck, wmKey, artOverride, opts = {}) {
 
   let primary, secondary, colorIdent;
   if (override) {
-    // ['C'] is allowed and stays as-is; otherwise WUBRG-sort the override.
-    colorIdent = override.includes('C') ? ['C'] : WUBRG.filter(c => override.includes(c));
+    // Identity stays WUBRG-sorted (with a trailing 'C') so watermark/hybrid
+    // lookups keyed by sorted pairs still resolve, e.g. ['W','C'] for a
+    // colorless blend. Primary/secondary instead follow the override's raw
+    // click order, independent of identity order, so W/B and B/W pick
+    // opposite frame/watermark sides for the same two-color identity.
+    const wubrgPart = WUBRG.filter(c => override.includes(c));
+    colorIdent = override.includes('C') ? [...wubrgPart, 'C'] : wubrgPart;
     if (!colorIdent.length) colorIdent = ['C'];
-    ({ primary, secondary } = primarySecondaryFromColors(colorIdent));
+    ({ primary, secondary } = primarySecondaryFromColors(override));
   } else {
     ({ primary, secondary } = primarySecondary(deck));
     colorIdent = deckColorIdentity(deck);
