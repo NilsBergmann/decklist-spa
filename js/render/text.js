@@ -73,25 +73,13 @@ export function wrapParagraph(ctx, spans, maxWidth, fontSize) {
   return lines;
 }
 
-// ── LAYOUT TEXT ──────────────────────────────────────────────────────────────
-
-export async function layoutText(ctx, rawText, { fontFamily, fontSize, maxWidth }) {
-  const lineHeight = fontSize * 1.22;
-  const baseline   = fontSize * 0.88;
-  const tokens     = tokenise(rawText);
-
-  let bold = false, color = '#000000', indentX = 0;
-
-  const paragraphs = [[]];
-  let currentPara = paragraphs[0];
+// Builds spans for one paragraph's tokens at a given font size, carrying
+// bold/color state in and out (a {bold}/{fontcolor} tag can appear mid-paragraph).
+function buildParagraphSpans(ctx, tokens, { fontFamily, fontSize, bold, color }) {
+  let indentX = 0;
+  const spans = [];
 
   for (const tok of tokens) {
-    if (tok.type === 'newline') {
-      paragraphs.push([]);
-      currentPara = paragraphs[paragraphs.length - 1];
-      indentX = 0;
-      continue;
-    }
     if (tok.type === 'tag') {
       const t = tok.value.toLowerCase();
       if (t === 'bold')              { bold = true; continue; }
@@ -110,9 +98,8 @@ export async function layoutText(ctx, rawText, { fontFamily, fontSize, maxWidth 
       const code = t.replace(/[-\/]/g, '');
       if (MANA_CODES.has(code)) {
         const sz = Math.round(fontSize * 0.78);
-        currentPara.push({ type: 'mana', code, size: sz, x: indentX, gap: Math.round(fontSize * 0.05) });
+        spans.push({ type: 'mana', code, size: sz, x: indentX, gap: Math.round(fontSize * 0.05) });
         indentX = 0;
-        continue;
       }
       continue;
     }
@@ -120,7 +107,7 @@ export async function layoutText(ctx, rawText, { fontFamily, fontSize, maxWidth 
     const font = `${bold ? 'bold ' : ''}${fontSize}px ${fontFamily}`;
     ctx.font = font;
     const w = ctx.measureText(tok.value).width;
-    currentPara.push({
+    spans.push({
       type: 'text', text: tok.value, bold, italic: false,
       color, fontFamily, size: fontSize,
       x: indentX, width: w,
@@ -128,11 +115,46 @@ export async function layoutText(ctx, rawText, { fontFamily, fontSize, maxWidth 
     indentX = 0;
   }
 
-  const lines = [];
-  for (const para of paragraphs) {
-    lines.push(...wrapParagraph(ctx, para, maxWidth, fontSize));
+  return { spans, bold, color };
+}
+
+// ── LAYOUT TEXT ──────────────────────────────────────────────────────────────
+// Each paragraph (line of markup, split on \n) is laid out independently: if a
+// paragraph would wrap onto a second line at the block's font size, its own
+// font size is shrunk (down to minParaFontSize) until it fits on one line,
+// without affecting the other paragraphs' size.
+
+export async function layoutText(ctx, rawText, { fontFamily, fontSize, maxWidth }) {
+  const tokens = tokenise(rawText);
+
+  const tokenParagraphs = [[]];
+  for (const tok of tokens) {
+    if (tok.type === 'newline') { tokenParagraphs.push([]); continue; }
+    tokenParagraphs[tokenParagraphs.length - 1].push(tok);
   }
-  return lines.map(spans => ({ spans, lineHeight, baseline }));
+
+  const minParaFontSize = Math.round(fontSize * 0.6);
+  let bold = false, color = '#000000';
+  const lines = [];
+
+  for (const paraTokens of tokenParagraphs) {
+    let paraFontSize = fontSize;
+    let wrapped;
+    for (;;) {
+      const built = buildParagraphSpans(ctx, paraTokens, { fontFamily, fontSize: paraFontSize, bold, color });
+      wrapped = wrapParagraph(ctx, built.spans, maxWidth, paraFontSize);
+      if (wrapped.length <= 1 || paraFontSize <= minParaFontSize) {
+        bold = built.bold; color = built.color;
+        break;
+      }
+      paraFontSize -= 1;
+    }
+    const lineHeight = paraFontSize * 1.22;
+    const baseline   = paraFontSize * 0.88;
+    for (const spans of wrapped) lines.push({ spans, lineHeight, baseline });
+  }
+
+  return lines;
 }
 
 // ── WRITE TEXT ────────────────────────────────────────────────────────────────
