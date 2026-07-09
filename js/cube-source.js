@@ -4,7 +4,7 @@ import {
   WUBRG, RARITY_ORDER,
   IGNORED_TAGS_SET, IGNORED_TAG_RE,
 } from './config.js?v=2';
-import { groupByType, groupDuplicates, sortTypes } from './card-utils.js?v=1';
+import { groupByType, groupDuplicates, sortTypes } from './card-utils.js?v=2';
 
 // ── NORMALIZE RARITY ─────────────────────────────────────────────────────────
 

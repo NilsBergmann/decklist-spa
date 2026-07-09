@@ -5,7 +5,7 @@
 import { WUBRG, RARITY_ORDER, RARITY_HEX } from './config.js?v=2';
 import { resolveWatermark } from './watermarks.js?v=3';
 import { splitTitleSubtitle } from './text-utils.js?v=2';
-import { groupByType, groupDuplicates, sortTypes } from './card-utils.js?v=1';
+import { groupByType, groupDuplicates, sortTypes, isPureHybridCard } from './card-utils.js?v=2';
 
 // ── PRIVATE HELPERS ──────────────────────────────────────────────────────────
 
@@ -24,7 +24,7 @@ function collectManaCodes(deck) {
 export function deckColors(deck) {
   const counts = {};
   for (const card of deck.cards) {
-    if (card.type === 'Token') continue;
+    if (card.type === 'Token' || isPureHybridCard(card)) continue;
     for (const c of card.colors) counts[c] = (counts[c] ?? 0) + 1;
   }
   return counts;
@@ -48,7 +48,7 @@ export function primarySecondary(deck) {
 export function deckColorIdentity(deck) {
   const seen = new Set();
   for (const card of deck.cards) {
-    if (card.type === 'Token') continue;
+    if (card.type === 'Token' || isPureHybridCard(card)) continue;
     for (const c of card.colors) seen.add(c);
   }
   const filtered = WUBRG.filter(c => seen.has(c));
