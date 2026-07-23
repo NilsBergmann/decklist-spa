@@ -12,8 +12,8 @@ import { register }          from './registry.js?v=1';
 import { loadImage, manaSrc, MANA_CODES, ensureFonts } from './assets.js?v=1';
 import { cutRoundedCorners } from './canvas-util.js?v=2';
 import { drawColorPips }     from './pips.js?v=1';
-import { buildSectionsMarkup, splitSectionsIntoColumns } from './markup.js?v=5';
-import { writeText, fitText, scaleWidth, scaleHeight } from './text.js?v=5';
+import { buildSectionsMarkup, splitSectionsIntoColumns } from './markup.js?v=6';
+import { writeText, fitText, layoutText, scaleWidth, scaleHeight } from './text.js?v=5';
 import {
   CC_W, CC_H, frameSrc, drawFrames, drawWatermark,
 } from './m15-shared.js?v=3';
@@ -121,15 +121,19 @@ const m152col = {
     if (topSections.length) {
       blocks.push({
         x: RULES_X, y: RULES_Y, width: RULES_WIDTH, height: topFrac,
-        oneLinePerRow: true, text: buildSectionsMarkup(topSections),
+        oneLinePerRow: true, stretch: false, text: buildSectionsMarkup(topSections),
       });
     }
     if (bottomSections.length) {
       const [leftSections, rightSections] = splitSectionsIntoColumns(bottomSections);
       // Land/Token rows skip the bullet entirely — rarity isn't meaningful
-      // info for these, unlike real spells.
-      blocks.push({ x: RULES_X, y: bottomY, width: COLUMN_WIDTH, height: bottomFrac, oneLinePerRow: false, text: buildSectionsMarkup(leftSections, { showBullet: false }) });
-      blocks.push({ x: RULES_X + COLUMN_WIDTH + COLUMN_GAP, y: bottomY, width: COLUMN_WIDTH, height: bottomFrac, oneLinePerRow: false, text: buildSectionsMarkup(rightSections, { showBullet: false }) });
+      // info for these, unlike real spells. oneLinePerRow: true so a long
+      // name shrinks itself rather than wrapping onto a second line; stretch
+      // spreads rows out to use the whole column height instead of leaving
+      // it under-filled whenever this column isn't the one that decided the
+      // shared font size.
+      blocks.push({ x: RULES_X, y: bottomY, width: COLUMN_WIDTH, height: bottomFrac, oneLinePerRow: true, stretch: true, text: buildSectionsMarkup(leftSections, { showBullet: false }) });
+      blocks.push({ x: RULES_X + COLUMN_WIDTH + COLUMN_GAP, y: bottomY, width: COLUMN_WIDTH, height: bottomFrac, oneLinePerRow: true, stretch: true, text: buildSectionsMarkup(rightSections, { showBullet: false }) });
     }
 
     // Find one font size that fits every block, so text size (and leading)
@@ -142,13 +146,26 @@ const m152col = {
       lineHeightMult: LINE_HEIGHT_MULT, minLineHeightMult: MIN_LINE_HEIGHT_MULT,
       oneLinePerRow: b.oneLinePerRow,
     })));
-    const sharedSize = fits.length ? Math.min(...fits.map(f => f.fontSize)) / CC_H : RULES_SIZE;
+    const sharedFontSizePx = fits.length ? Math.min(...fits.map(f => f.fontSize)) : baseFontSizePx;
+    const sharedSize = sharedFontSizePx / CC_H;
 
     for (const b of blocks) {
+      let lineHeightMult = LINE_HEIGHT_MULT, minLineHeightMult = MIN_LINE_HEIGHT_MULT;
+      if (b.stretch) {
+        // Recount this block's own lines at the shared size (oneLinePerRow
+        // guarantees exactly one line per row), then spread them evenly
+        // across the full box height instead of the tighter natural leading.
+        const lines = await layoutText(ctx, b.text, {
+          fontFamily: 'mplantin', fontSize: sharedFontSizePx, maxWidth: scaleWidth(b.width, card), oneLinePerRow: true,
+        });
+        const boxHeightPx = scaleHeight(b.height, card);
+        const stretchedMult = (boxHeightPx / Math.max(1, lines.length) / sharedFontSizePx) * 0.995;
+        lineHeightMult = Math.max(LINE_HEIGHT_MULT, stretchedMult);
+        minLineHeightMult = lineHeightMult;
+      }
       await writeText(ctx, card, {
         font: 'mplantin', x: b.x, y: b.y, width: b.width, height: b.height, size: sharedSize,
-        lineHeightMult: LINE_HEIGHT_MULT, minLineHeightMult: MIN_LINE_HEIGHT_MULT,
-        oneLinePerRow: b.oneLinePerRow, text: b.text,
+        lineHeightMult, minLineHeightMult, oneLinePerRow: b.oneLinePerRow, text: b.text,
       });
     }
 
