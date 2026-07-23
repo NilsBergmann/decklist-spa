@@ -5,7 +5,18 @@
 import { WUBRG, RARITY_ORDER, RARITY_HEX } from './config.js?v=2';
 import { resolveWatermark } from './watermarks.js?v=3';
 import { splitTitleSubtitle } from './text-utils.js?v=2';
-import { groupByType, groupDuplicates, sortTypes, isPureHybridCard } from './card-utils.js?v=2';
+import {
+  groupByType, groupDuplicates, sortTypes, isPureHybridCard,
+  compareByCountThenRarity, compareByCountThenName,
+} from './card-utils.js?v=3';
+
+// Land rows print highest-count-first (then rarity); Token rows print
+// highest-count-first (then alphabetical) — everything else keeps the
+// default rarity-only order.
+const ROW_COMPARE_BY_TYPE = {
+  Land: compareByCountThenRarity,
+  Token: compareByCountThenName,
+};
 
 // ── PRIVATE HELPERS ──────────────────────────────────────────────────────────
 
@@ -125,7 +136,7 @@ export function buildDeckModel(deck, wmKey, artOverride, opts = {}) {
   const sections = [];
   for (const type of sortedTypes) {
     if (type === 'Other') continue;
-    const dupes = groupDuplicates(typeGroups[type]);
+    const dupes = groupDuplicates(typeGroups[type], ROW_COMPARE_BY_TYPE[type]);
     sections.push({
       type,
       total: typeGroups[type].length,
