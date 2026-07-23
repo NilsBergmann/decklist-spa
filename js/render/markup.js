@@ -3,6 +3,20 @@
 // consumed by writeText. Shared by the m15 and art-bg renderers (the only place
 // CC markup is generated for them).
 
+// Section headings always read as a plural category name ("Creatures",
+// "Lands"), regardless of card count — TYPE_ORDER's singular bucket names
+// stay singular (grouping/sorting/YAML/manual-text round-trip all key off
+// them unchanged), this only affects the printed heading text.
+const PLURAL_TYPE_LABELS = {
+  Creature: 'Creatures', Land: 'Lands', Token: 'Tokens', Planeswalker: 'Planeswalkers',
+};
+
+function pluralizeTypeLabel(type) {
+  if (PLURAL_TYPE_LABELS[type]) return PLURAL_TYPE_LABELS[type];
+  if (type.includes('&') || type.endsWith('s')) return type;   // already plural / compound
+  return `${type}s`;
+}
+
 // Builds markup for an explicit list of sections (a subset for a column, or
 // the full model.sections for a single-column layout). showBullet: false
 // omits the rarity-diamond bullet AND its tab-stop indentation entirely —
@@ -11,7 +25,7 @@
 export function buildSectionsMarkup(sections, { showBullet = true } = {}) {
   const lines = [];
   for (const section of sections) {
-    lines.push(`{bold}${section.type} (${section.total}){/bold}`);
+    lines.push(`{bold}${pluralizeTypeLabel(section.type)} (${section.total}){/bold}`);
     for (const row of section.rows) {
       if (!showBullet) {
         const countPrefix = row.count > 1 ? `${row.count}x ` : '';
