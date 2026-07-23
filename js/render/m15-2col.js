@@ -12,7 +12,7 @@ import { register }          from './registry.js?v=1';
 import { loadImage, manaSrc, MANA_CODES, ensureFonts } from './assets.js?v=1';
 import { cutRoundedCorners } from './canvas-util.js?v=2';
 import { drawColorPips }     from './pips.js?v=1';
-import { buildSectionsMarkup, splitSectionsIntoColumns } from './markup.js?v=2';
+import { buildSectionsMarkup, splitSectionsIntoColumns } from './markup.js?v=3';
 import { writeText, fitText, scaleWidth, scaleHeight } from './text.js?v=5';
 import {
   CC_W, CC_H, frameSrc, drawFrames, drawWatermark,
@@ -126,8 +126,10 @@ const m152col = {
     }
     if (bottomSections.length) {
       const [leftSections, rightSections] = splitSectionsIntoColumns(bottomSections);
-      blocks.push({ x: RULES_X, y: bottomY, width: COLUMN_WIDTH, height: bottomFrac, oneLinePerRow: false, text: buildSectionsMarkup(leftSections) });
-      blocks.push({ x: RULES_X + COLUMN_WIDTH + COLUMN_GAP, y: bottomY, width: COLUMN_WIDTH, height: bottomFrac, oneLinePerRow: false, text: buildSectionsMarkup(rightSections) });
+      // Land/Token rows skip the rarity-colored diamond — rarity isn't
+      // meaningful info for these, unlike real spells.
+      blocks.push({ x: RULES_X, y: bottomY, width: COLUMN_WIDTH, height: bottomFrac, oneLinePerRow: false, text: buildSectionsMarkup(leftSections, { showRarity: false }) });
+      blocks.push({ x: RULES_X + COLUMN_WIDTH + COLUMN_GAP, y: bottomY, width: COLUMN_WIDTH, height: bottomFrac, oneLinePerRow: false, text: buildSectionsMarkup(rightSections, { showRarity: false }) });
     }
 
     // Find one font size that fits every block, so text size (and leading)
