@@ -12,8 +12,8 @@ export const RARITY_HEX = {
 export const WUBRG = ['W', 'U', 'B', 'R', 'G'];
 
 export const TYPE_ORDER = [
-  'Planeswalker', 'Creature', 'Instant', 'Sorcery',
-  'Artifact', 'Land', 'Token',
+  'Planeswalker', 'Creature', 'Instants & Sorceries',
+  'Artifacts & Enchantments', 'Land', 'Token',
 ];
 
 export const RARITY_ORDER = ['common', 'uncommon', 'rare', 'mythic'];

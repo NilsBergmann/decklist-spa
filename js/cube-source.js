@@ -127,14 +127,23 @@ export function sanitizeParsedCost(parsedCost, cmc) {
   return kept;
 }
 
+// Collapses type-bucket synonyms so cards land in one printed section
+// regardless of source (CubeCobra type line vs a manual-entry header):
+// Enchantment/Artifact → 'Artifacts & Enchantments', Instant/Sorcery →
+// 'Instants & Sorceries'.
+function canonicalizeTypeBucket(base) {
+  if (base.includes('Enchantment') || base.includes('Artifact')) return 'Artifacts & Enchantments';
+  if (base.includes('Instant') || base.includes('Sorcery')) return 'Instants & Sorceries';
+  return base;
+}
+
 export function simplifyType(typeStr) {
   if (!typeStr) return 'Other';
   const base = typeStr.split(' — ')[0].replace(/^Legendary /, '').replace(/^Basic /, '');
   if (base === 'Card') return 'Other';
   if (base.includes('Token')) return 'Token';
   if (base.includes('Creature')) return 'Creature';
-  if (base.includes('Enchantment')) return 'Artifact';
-  return base;
+  return canonicalizeTypeBucket(base);
 }
 
 // ── CUBECOBRA PARSE ──────────────────────────────────────────────────────────
@@ -236,7 +245,7 @@ export function parseManualDeck(text) {
     }
 
     // Type header
-    currentType = line.replace(/\s*\(\d+\)$/, '').trim();
+    currentType = canonicalizeTypeBucket(line.replace(/\s*\(\d+\)$/, '').trim());
   }
 
   return decks.filter(d => d.cards.length > 0);
