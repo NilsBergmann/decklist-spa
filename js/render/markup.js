@@ -3,9 +3,11 @@
 // consumed by writeText. Shared by the m15 and art-bg renderers (the only place
 // CC markup is generated for them).
 
-export function buildTextMarkup(model) {
+// Builds markup for an explicit list of sections (a subset for a column, or
+// the full model.sections for a single-column layout).
+export function buildSectionsMarkup(sections) {
   const lines = [];
-  for (const section of model.sections) {
+  for (const section of sections) {
     lines.push(`{bold}${section.type} (${section.total}){/bold}`);
     for (const row of section.rows) {
       // {rightN}: absolute tab-stop at N×fontSize/100 px from text-box left.
@@ -17,4 +19,23 @@ export function buildTextMarkup(model) {
     }
   }
   return lines.join('\\n');
+}
+
+export function buildTextMarkup(model) {
+  return buildSectionsMarkup(model.sections);
+}
+
+// Splits sections into two column groups of roughly equal weight (header +
+// row count per section), without breaking a section across columns.
+// Greedy: walk sections in order, drop each whole section into whichever
+// column currently has the smaller running weight.
+export function splitSectionsIntoColumns(sections) {
+  const left = [], right = [];
+  let leftWeight = 0, rightWeight = 0;
+  for (const section of sections) {
+    const weight = 1 + section.rows.length;
+    if (leftWeight <= rightWeight) { left.push(section); leftWeight += weight; }
+    else                           { right.push(section); rightWeight += weight; }
+  }
+  return [left, right];
 }

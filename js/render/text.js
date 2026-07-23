@@ -119,12 +119,19 @@ function buildParagraphSpans(ctx, tokens, { fontFamily, fontSize, bold, color })
 }
 
 // ── LAYOUT TEXT ──────────────────────────────────────────────────────────────
-// Each paragraph (line of markup, split on \n) is laid out independently: if a
-// paragraph would wrap onto a second line at the block's font size, its own
-// font size is shrunk (down to minParaFontSize) until it fits on one line,
-// without affecting the other paragraphs' size.
+// Each paragraph (line of markup, split on \n) is laid out independently. By
+// default (oneLinePerRow: true — used by the full-width single-column m15
+// style, where a paragraph wrapping is rare and worth avoiding) a paragraph
+// that would wrap onto a second line at the block's font size instead has
+// its own font size shrunk (down to minParaFontSize) until it fits on one
+// line, without affecting the other paragraphs' size. With oneLinePerRow:
+// false (the narrower 2-column style, where a plain wrap looks normal and
+// avoids many differently-shrunk row sizes side by side) paragraphs just
+// wrap at the given font size instead of shrinking.
 
-export async function layoutText(ctx, rawText, { fontFamily, fontSize, maxWidth }) {
+export async function layoutText(ctx, rawText, {
+  fontFamily, fontSize, maxWidth, lineHeightMult = 1.22, oneLinePerRow = true,
+}) {
   const tokens = tokenise(rawText);
 
   const tokenParagraphs = [[]];
@@ -140,16 +147,22 @@ export async function layoutText(ctx, rawText, { fontFamily, fontSize, maxWidth 
   for (const paraTokens of tokenParagraphs) {
     let paraFontSize = fontSize;
     let wrapped;
-    for (;;) {
+    if (oneLinePerRow) {
+      for (;;) {
+        const built = buildParagraphSpans(ctx, paraTokens, { fontFamily, fontSize: paraFontSize, bold, color });
+        wrapped = wrapParagraph(ctx, built.spans, maxWidth, paraFontSize);
+        if (wrapped.length <= 1 || paraFontSize <= minParaFontSize) {
+          bold = built.bold; color = built.color;
+          break;
+        }
+        paraFontSize -= 1;
+      }
+    } else {
       const built = buildParagraphSpans(ctx, paraTokens, { fontFamily, fontSize: paraFontSize, bold, color });
       wrapped = wrapParagraph(ctx, built.spans, maxWidth, paraFontSize);
-      if (wrapped.length <= 1 || paraFontSize <= minParaFontSize) {
-        bold = built.bold; color = built.color;
-        break;
-      }
-      paraFontSize -= 1;
+      bold = built.bold; color = built.color;
     }
-    const lineHeight = paraFontSize * 1.22;
+    const lineHeight = paraFontSize * lineHeightMult;
     const baseline   = paraFontSize * 0.88;
     for (const spans of wrapped) lines.push({ spans, lineHeight, baseline });
   }
@@ -157,8 +170,48 @@ export async function layoutText(ctx, rawText, { fontFamily, fontSize, maxWidth 
   return lines;
 }
 
+// ── FIT TEXT ─────────────────────────────────────────────────────────────────
+// Measure-only shrink-to-fit: finds the largest font size (and, within that,
+// the largest line-height multiplier) that lays `rawText` out within
+// maxWidth × boxHeight, without drawing anything. writeText uses this to
+// render; callers that need several text blocks to share one consistent
+// font size (rather than each shrinking independently to a different size)
+// can call this per block first, take the smallest result, and pass that
+// back in as `fontSize` to every writeText call.
+//
+// Overflow is resolved in two stages: first the line-height is squeezed from
+// lineHeightMult down to minLineHeightMult (free — same font, just tighter
+// leading), and only once that floor is reached does font size shrink.
+// Callers that don't pass either multiplier get the original fixed-1.22-
+// leading, shrink-font-only behavior.
+
+export async function fitText(ctx, rawText, {
+  fontFamily, fontSize, maxWidth, boxHeight, lineHeightMult = 1.22, minLineHeightMult, oneLinePerRow = true,
+}) {
+  const minLHM = minLineHeightMult ?? lineHeightMult;
+  const minSize = Math.round(fontSize * 0.5);
+
+  let size = fontSize;
+  let lines, lhMultUsed;
+  while (size >= minSize) {
+    let lhMult = lineHeightMult;
+    for (;;) {
+      lines = await layoutText(ctx, rawText, { fontFamily, fontSize: size, maxWidth, lineHeightMult: lhMult, oneLinePerRow });
+      const totalH = lines.reduce((s, l) => s + l.lineHeight, 0);
+      if (totalH <= boxHeight || lhMult <= minLHM) { lhMultUsed = lhMult; break; }
+      lhMult = Math.max(minLHM, lhMult - 0.02);
+    }
+    const totalH = lines.reduce((s, l) => s + l.lineHeight, 0);
+    if (totalH <= boxHeight || size <= minSize) break;
+    size -= 1;
+  }
+
+  return { fontSize: size, lineHeightMult: lhMultUsed, lines };
+}
+
 // ── WRITE TEXT ────────────────────────────────────────────────────────────────
-// textObj: { text, font, x, y, width, height, size, oneLine? }
+// textObj: { text, font, x, y, width, height, size, oneLine?, lineHeightMult?,
+//            minLineHeightMult?, oneLinePerRow? }
 // card: { width, height, marginX, marginY }
 
 export async function writeText(ctx, card, textObj) {
@@ -168,16 +221,14 @@ export async function writeText(ctx, card, textObj) {
   const bh = scaleHeight(textObj.height, card);
 
   const fontFamily = textObj.font;
-  let fontSize = Math.round(scaleHeight(textObj.size, card));
-  const minSize = Math.round(fontSize * 0.5);
+  const fontSize0  = Math.round(scaleHeight(textObj.size, card));
 
-  let lines;
-  while (fontSize >= minSize) {
-    lines = await layoutText(ctx, textObj.text, { fontFamily, fontSize, maxWidth: bw });
-    const totalH = lines.reduce((s, l) => s + l.lineHeight, 0);
-    if (totalH <= bh || fontSize <= minSize) break;
-    fontSize -= 1;
-  }
+  const { lines } = await fitText(ctx, textObj.text, {
+    fontFamily, fontSize: fontSize0, maxWidth: bw, boxHeight: bh,
+    lineHeightMult: textObj.lineHeightMult ?? 1.22,
+    minLineHeightMult: textObj.minLineHeightMult,
+    oneLinePerRow: textObj.oneLinePerRow ?? true,
+  });
 
   let cy = y0;
   for (const line of lines) {
