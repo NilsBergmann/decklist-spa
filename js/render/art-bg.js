@@ -8,8 +8,8 @@ import { loadImage, ensureFonts } from './assets.js?v=1';
 import { COLOR_HEX }           from '../config.js?v=2';
 import { cutRoundedCorners, roundRectPath, drawCoverFitImage } from './canvas-util.js?v=2';
 import { drawColorPips }       from './pips.js?v=1';
-import { buildTextMarkup }     from './markup.js?v=6';
-import { writeText }           from './text.js?v=5';
+import { buildTextMarkup }     from './markup.js?v=8';
+import { writeText }           from './text.js?v=8';
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
 

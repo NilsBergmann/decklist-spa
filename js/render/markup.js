@@ -26,18 +26,25 @@ export function buildSectionsMarkup(sections, { showBullet = true } = {}) {
   const lines = [];
   for (const section of sections) {
     lines.push(`{bold}${pluralizeTypeLabel(section.type)} (${section.total}){/bold}`);
+    // Tokens aren't cast, so a mana cost carried over from the card that
+    // creates them isn't meaningful info — omit it entirely for Token rows.
+    const showCost = section.type !== 'Token';
     for (const row of section.rows) {
+      const costSuffix = showCost && row.cost ? ` ${row.cost}` : '';
       if (!showBullet) {
         const countPrefix = row.count > 1 ? `${row.count}x ` : '';
-        lines.push(`${countPrefix}${row.name} ${row.cost}`);
+        lines.push(`${countPrefix}${row.name}${costSuffix}`);
         continue;
       }
       // {rightN}: absolute tab-stop at N×fontSize/100 px from text-box left.
       // Diamond always at {right130}; count prefix sits at {right5}. Shared
       // tab-stop keeps every row's diamond in one aligned column regardless
-      // of whether it has a count prefix.
+      // of whether it has a count prefix. {diamond} renders at a fixed size
+      // (the block's base font size) instead of scaling with the row's own
+      // text, so a shrunk long name's diamond still matches every other
+      // row's — see text.js.
       const prefix = row.count > 1 ? `{right5}${row.count}x{right130}` : `{right130}`;
-      lines.push(`${prefix}{fontcolor${row.rarityHex}}◆ {fontcolor#000000}${row.name} ${row.cost}`);
+      lines.push(`${prefix}{fontcolor${row.rarityHex}}{diamond} {fontcolor#000000}${row.name}${costSuffix}`);
     }
   }
   return lines.join('\\n');

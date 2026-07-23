@@ -40,8 +40,8 @@ export function wrapParagraph(ctx, spans, maxWidth, fontSize) {
   let current = [], currentW = 0;
 
   for (const span of spans) {
-    if (span.type === 'mana') {
-      const total = span.x + span.size + span.gap;
+    if (span.type === 'mana' || span.type === 'diamond') {
+      const total = span.x + span.width + (span.gap || 0);
       if (currentW + total > maxWidth && current.length > 0) {
         lines.push(current); current = []; currentW = 0;
       }
@@ -75,7 +75,11 @@ export function wrapParagraph(ctx, spans, maxWidth, fontSize) {
 
 // Builds spans for one paragraph's tokens at a given font size, carrying
 // bold/color state in and out (a {bold}/{fontcolor} tag can appear mid-paragraph).
-function buildParagraphSpans(ctx, tokens, { fontFamily, fontSize, bold, color }) {
+// baseFontSize is the block's own (pre-shrink) font size — {diamond} sizes
+// itself off that instead of the (possibly individually-shrunk) fontSize,
+// so a long name's own shrink doesn't shrink its rarity diamond too, and
+// diamonds stay the same size across every row in the block.
+function buildParagraphSpans(ctx, tokens, { fontFamily, fontSize, baseFontSize, bold, color }) {
   let indentX = 0;
   const spans = [];
 
@@ -89,16 +93,28 @@ function buildParagraphSpans(ctx, tokens, { fontFamily, fontSize, bold, color })
         continue;
       }
       if (t.startsWith('right')) {
-        // {rightN}: absolute tab-stop at N×fontSize/100 px from text-box left
+        // {rightN}: absolute tab-stop at N×baseFontSize/100 px from text-box
+        // left. Anchored to baseFontSize (not this row's own, possibly
+        // shrunk, fontSize) so every row's tab-stop — and whatever sits at
+        // it, like the rarity diamond — lines up in the same column
+        // regardless of which rows needed shrinking to fit.
         const n = parseFloat(t.slice('right'.length)) || 0;
-        indentX = Math.round(n * fontSize / 100);
+        indentX = Math.round(n * (baseFontSize ?? fontSize) / 100);
+        continue;
+      }
+      if (t === 'diamond') {
+        const dsz = baseFontSize ?? fontSize;
+        ctx.font = `${dsz}px ${fontFamily}`;
+        const dw = ctx.measureText('◆').width;
+        spans.push({ type: 'diamond', size: dsz, fontFamily, color, x: indentX, width: dw });
+        indentX = 0;
         continue;
       }
       // Inline mana symbol
       const code = t.replace(/[-\/]/g, '');
       if (MANA_CODES.has(code)) {
         const sz = Math.round(fontSize * 0.78);
-        spans.push({ type: 'mana', code, size: sz, x: indentX, gap: Math.round(fontSize * 0.05) });
+        spans.push({ type: 'mana', code, size: sz, width: sz, x: indentX, gap: Math.round(fontSize * 0.05) });
         indentX = 0;
       }
       continue;
@@ -149,7 +165,7 @@ export async function layoutText(ctx, rawText, {
     let wrapped;
     if (oneLinePerRow) {
       for (;;) {
-        const built = buildParagraphSpans(ctx, paraTokens, { fontFamily, fontSize: paraFontSize, bold, color });
+        const built = buildParagraphSpans(ctx, paraTokens, { fontFamily, fontSize: paraFontSize, baseFontSize: fontSize, bold, color });
         wrapped = wrapParagraph(ctx, built.spans, maxWidth, paraFontSize);
         if (wrapped.length <= 1 || paraFontSize <= minParaFontSize) {
           bold = built.bold; color = built.color;
@@ -158,7 +174,7 @@ export async function layoutText(ctx, rawText, {
         paraFontSize -= 1;
       }
     } else {
-      const built = buildParagraphSpans(ctx, paraTokens, { fontFamily, fontSize: paraFontSize, bold, color });
+      const built = buildParagraphSpans(ctx, paraTokens, { fontFamily, fontSize: paraFontSize, baseFontSize: fontSize, bold, color });
       wrapped = wrapParagraph(ctx, built.spans, maxWidth, paraFontSize);
       bold = built.bold; color = built.color;
     }
@@ -238,9 +254,29 @@ export async function writeText(ctx, card, textObj) {
       if (span.type === 'mana') {
         const img = await loadImage(manaSrc(span.code));
         const sz  = span.size;
-        const iy  = cy + line.lineHeight * 0.5 - sz * 0.5 - line.lineHeight * 0.08;
+        // Text sits at a baseline fixed relative to font size (line.baseline
+        // = paraFontSize × 0.88), independent of line.lineHeight. The icon
+        // must anchor the same way — purely off its own size (sz, itself
+        // proportional to paraFontSize) — or it drifts relative to the text
+        // whenever a block's lineHeightMult isn't the original fixed 1.22
+        // this offset was tuned against (line.lineHeight can now be
+        // squeezed or stretched well away from that). 0.157×sz reproduces
+        // the original look at 1.22 leading, but stays locked to the text
+        // regardless of leading.
+        const iy = cy + sz * 0.157;
         ctx.drawImage(img, cx, iy, sz, sz);
         cx += sz + span.gap;
+      } else if (span.type === 'diamond') {
+        // Fixed size (span.size = the block's base font size, not this
+        // row's own — possibly shrunk — one) so every row's diamond
+        // matches; same baseline as the row's own text so it still sits on
+        // the same visual line as the name next to it.
+        ctx.save();
+        ctx.font      = `${span.size}px ${span.fontFamily}`;
+        ctx.fillStyle = span.color || '#000000';
+        ctx.fillText('◆', cx, cy + line.baseline);
+        cx += span.width;
+        ctx.restore();
       } else {
         ctx.save();
         ctx.font      = `${span.bold ? 'bold ' : ''}${span.italic ? 'italic ' : ''}${span.size}px ${span.fontFamily}`;

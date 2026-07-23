@@ -4,7 +4,7 @@
 // itself (title/rules boxes, column count) stays per-renderer.
 
 import { loadImage } from './assets.js?v=1';
-import { scaleX, scaleY, scaleWidth, scaleHeight } from './text.js?v=5';
+import { scaleX, scaleY, scaleWidth, scaleHeight } from './text.js?v=8';
 
 export const CC_W = 2010;
 export const CC_H = 2814;

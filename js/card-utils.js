@@ -10,15 +10,30 @@ export function groupByType(cards) {
   return g;
 }
 
-export function groupDuplicates(cards) {
+function compareByRarity(a, b) {
+  return RARITY_ORDER.indexOf(a.card.rarity) - RARITY_ORDER.indexOf(b.card.rarity);
+}
+
+// Highest count first, rarity as the tiebreak — used for the printed Land
+// section, where "how many copies" is the more useful ordering signal.
+export function compareByCountThenRarity(a, b) {
+  return b.count - a.count || compareByRarity(a, b);
+}
+
+// Highest count first, alphabetical as the tiebreak — used for the printed
+// Token section, where rarity isn't meaningful (see isPureHybridCard /
+// showCost above) but scanning for a specific token by name is.
+export function compareByCountThenName(a, b) {
+  return b.count - a.count || a.card.name.localeCompare(b.card.name);
+}
+
+export function groupDuplicates(cards, compare = compareByRarity) {
   const map = {};
   for (const c of cards) {
     if (map[c.name]) map[c.name].count++;
     else map[c.name] = { card: c, count: 1 };
   }
-  return Object.values(map).sort(
-    (a, b) => RARITY_ORDER.indexOf(a.card.rarity) - RARITY_ORDER.indexOf(b.card.rarity),
-  );
+  return Object.values(map).sort(compare);
 }
 
 // Sorts type names by TYPE_ORDER; unrecognized types (e.g. "Other") sort last.

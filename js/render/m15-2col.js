@@ -12,11 +12,11 @@ import { register }          from './registry.js?v=1';
 import { loadImage, manaSrc, MANA_CODES, ensureFonts } from './assets.js?v=1';
 import { cutRoundedCorners } from './canvas-util.js?v=2';
 import { drawColorPips }     from './pips.js?v=1';
-import { buildSectionsMarkup, splitSectionsIntoColumns } from './markup.js?v=6';
-import { writeText, fitText, layoutText, scaleWidth, scaleHeight } from './text.js?v=5';
+import { buildSectionsMarkup, splitSectionsIntoColumns } from './markup.js?v=8';
+import { writeText, layoutText, scaleWidth, scaleHeight } from './text.js?v=8';
 import {
   CC_W, CC_H, frameSrc, drawFrames, drawWatermark,
-} from './m15-shared.js?v=3';
+} from './m15-shared.js?v=6';
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -35,22 +35,18 @@ const RULES_X      = 0.100;
 const RULES_WIDTH  = 0.826;
 const COLUMN_GAP    = 0.03;
 const COLUMN_WIDTH  = (RULES_WIDTH - COLUMN_GAP) / 2;
-const BLOCK_GAP     = 0.012;   // vertical gap between the spell block and the land/token block
-const MIN_BLOCK_FRAC = 0.15;   // neither block shrinks below this share of RULES_HEIGHT
+const MIN_BLOCK_GAP = 0.012;   // smallest allowed vfill between the spell block and the land/token block
 
 const RULES_SIZE = 0.0362;   // same base as m15 — starting point for the shared-size search below
 
-// Same leading range for every block (spell block + both land/token columns)
-// so a shared font size also means a visually consistent leading, not just
-// matching numbers.
+// Same leading range for the spell block and both land/token columns, so
+// entries keep one consistent spacing throughout the whole card — the two
+// blocks are separated by a single flexible gap (vfill) instead of each
+// block's own rows being stretched or squeezed independently.
 const LINE_HEIGHT_MULT     = 1.15;
 const MIN_LINE_HEIGHT_MULT = 0.95;
 
 const BOTTOM_TYPES = new Set(['Land', 'Token']);
-
-function sectionWeight(sections) {
-  return sections.reduce((sum, s) => sum + 1 + s.rows.length, 0);
-}
 
 // ── RENDERER OBJECT ───────────────────────────────────────────────────────────
 
@@ -98,75 +94,84 @@ const m152col = {
     });
 
     // 5. Rules text: spell sections as one full-width block, Land/Token
-    // split into two columns underneath, each block's height proportional
-    // to its section weight (row + header count).
+    // split into two columns underneath. Both blocks use the same
+    // consistent, natural row spacing (no per-row stretching or squeezing
+    // between them); instead, a single flexible gap (vfill) between the two
+    // blocks absorbs whatever space is left over, so the land/token block
+    // sits flush against the bottom of the card.
     const topSections    = model.sections.filter(s => !BOTTOM_TYPES.has(s.type));
     const bottomSections = model.sections.filter(s => BOTTOM_TYPES.has(s.type));
+    const hasBoth = topSections.length && bottomSections.length;
 
-    let topFrac, bottomFrac, bottomY;
-    if (topSections.length && bottomSections.length) {
-      const topWeight = sectionWeight(topSections), bottomWeight = sectionWeight(bottomSections);
-      const rawTopFrac = (RULES_HEIGHT - BLOCK_GAP) * topWeight / (topWeight + bottomWeight);
-      topFrac = Math.max(MIN_BLOCK_FRAC, Math.min(RULES_HEIGHT - BLOCK_GAP - MIN_BLOCK_FRAC, rawTopFrac));
-      bottomFrac = RULES_HEIGHT - BLOCK_GAP - topFrac;
-      bottomY = RULES_Y + topFrac + BLOCK_GAP;
-    } else if (topSections.length) {
-      topFrac = RULES_HEIGHT;
-    } else {
-      bottomFrac = RULES_HEIGHT;
-      bottomY = RULES_Y;
-    }
-
-    const blocks = [];
-    if (topSections.length) {
-      blocks.push({
-        x: RULES_X, y: RULES_Y, width: RULES_WIDTH, height: topFrac,
-        oneLinePerRow: true, stretch: false, text: buildSectionsMarkup(topSections),
-      });
-    }
+    const topMarkup = topSections.length ? buildSectionsMarkup(topSections) : '';
+    let leftMarkup = '', rightMarkup = '';
     if (bottomSections.length) {
       const [leftSections, rightSections] = splitSectionsIntoColumns(bottomSections);
       // Land/Token rows skip the bullet entirely — rarity isn't meaningful
-      // info for these, unlike real spells. oneLinePerRow: true so a long
-      // name shrinks itself rather than wrapping onto a second line; stretch
-      // spreads rows out to use the whole column height instead of leaving
-      // it under-filled whenever this column isn't the one that decided the
-      // shared font size.
-      blocks.push({ x: RULES_X, y: bottomY, width: COLUMN_WIDTH, height: bottomFrac, oneLinePerRow: true, stretch: true, text: buildSectionsMarkup(leftSections, { showBullet: false }) });
-      blocks.push({ x: RULES_X + COLUMN_WIDTH + COLUMN_GAP, y: bottomY, width: COLUMN_WIDTH, height: bottomFrac, oneLinePerRow: true, stretch: true, text: buildSectionsMarkup(rightSections, { showBullet: false }) });
+      // info for these, unlike real spells.
+      leftMarkup  = buildSectionsMarkup(leftSections, { showBullet: false });
+      rightMarkup = buildSectionsMarkup(rightSections, { showBullet: false });
     }
 
-    // Find one font size that fits every block, so text size (and leading)
-    // stays consistent across the whole card instead of each block
-    // independently shrinking to a different size.
-    const baseFontSizePx = Math.round(RULES_SIZE * CC_H);
-    const fits = await Promise.all(blocks.map(b => fitText(ctx, b.text, {
-      fontFamily: 'mplantin', fontSize: baseFontSizePx,
-      maxWidth: scaleWidth(b.width, card), boxHeight: scaleHeight(b.height, card),
-      lineHeightMult: LINE_HEIGHT_MULT, minLineHeightMult: MIN_LINE_HEIGHT_MULT,
-      oneLinePerRow: b.oneLinePerRow,
-    })));
-    const sharedFontSizePx = fits.length ? Math.min(...fits.map(f => f.fontSize)) : baseFontSizePx;
-    const sharedSize = sharedFontSizePx / CC_H;
+    const rulesWidthPx  = scaleWidth(RULES_WIDTH, card);
+    const columnWidthPx = scaleWidth(COLUMN_WIDTH, card);
+    const rulesHeightPx = scaleHeight(RULES_HEIGHT, card);
+    const minGapPx      = scaleHeight(MIN_BLOCK_GAP, card);
 
-    for (const b of blocks) {
-      let lineHeightMult = LINE_HEIGHT_MULT, minLineHeightMult = MIN_LINE_HEIGHT_MULT;
-      if (b.stretch) {
-        // Recount this block's own lines at the shared size (oneLinePerRow
-        // guarantees exactly one line per row), then spread them evenly
-        // across the full box height instead of the tighter natural leading.
-        const lines = await layoutText(ctx, b.text, {
-          fontFamily: 'mplantin', fontSize: sharedFontSizePx, maxWidth: scaleWidth(b.width, card), oneLinePerRow: true,
-        });
-        const boxHeightPx = scaleHeight(b.height, card);
-        const stretchedMult = (boxHeightPx / Math.max(1, lines.length) / sharedFontSizePx) * 0.995;
-        lineHeightMult = Math.max(LINE_HEIGHT_MULT, stretchedMult);
-        minLineHeightMult = lineHeightMult;
+    // oneLinePerRow: true throughout — a long name shrinks itself rather
+    // than wrapping onto a second line, in both the spell block and the
+    // (now much narrower) land/token columns.
+    async function measure(fontSizePx, lhMult) {
+      const topLines = topSections.length ? await layoutText(ctx, topMarkup, {
+        fontFamily: 'mplantin', fontSize: fontSizePx, maxWidth: rulesWidthPx, lineHeightMult: lhMult, oneLinePerRow: true,
+      }) : [];
+      const topH = topLines.reduce((s, l) => s + l.lineHeight, 0);
+
+      let bottomH = 0;
+      if (bottomSections.length) {
+        const leftLines  = await layoutText(ctx, leftMarkup,  { fontFamily: 'mplantin', fontSize: fontSizePx, maxWidth: columnWidthPx, lineHeightMult: lhMult, oneLinePerRow: true });
+        const rightLines = await layoutText(ctx, rightMarkup, { fontFamily: 'mplantin', fontSize: fontSizePx, maxWidth: columnWidthPx, lineHeightMult: lhMult, oneLinePerRow: true });
+        bottomH = Math.max(
+          leftLines.reduce((s, l) => s + l.lineHeight, 0),
+          rightLines.reduce((s, l) => s + l.lineHeight, 0),
+        );
       }
+      return { topH, bottomH };
+    }
+
+    let fontSizePx = Math.round(RULES_SIZE * CC_H);
+    const minFontSizePx = Math.round(fontSizePx * 0.5);
+    let lhMult = LINE_HEIGHT_MULT, topH = 0, bottomH = 0;
+    for (;;) {
+      lhMult = LINE_HEIGHT_MULT;
+      for (;;) {
+        ({ topH, bottomH } = await measure(fontSizePx, lhMult));
+        const needed = topH + (hasBoth ? minGapPx : 0) + bottomH;
+        if (needed <= rulesHeightPx || lhMult <= MIN_LINE_HEIGHT_MULT) break;
+        lhMult = Math.max(MIN_LINE_HEIGHT_MULT, lhMult - 0.02);
+      }
+      const needed = topH + (hasBoth ? minGapPx : 0) + bottomH;
+      if (needed <= rulesHeightPx || fontSizePx <= minFontSizePx) break;
+      fontSizePx -= 1;
+    }
+
+    const sharedSize = fontSizePx / CC_H;
+    const gapPx = hasBoth ? Math.max(minGapPx, rulesHeightPx - topH - bottomH) : 0;
+
+    if (topSections.length) {
       await writeText(ctx, card, {
-        font: 'mplantin', x: b.x, y: b.y, width: b.width, height: b.height, size: sharedSize,
-        lineHeightMult, minLineHeightMult, oneLinePerRow: b.oneLinePerRow, text: b.text,
+        font: 'mplantin', x: RULES_X, y: RULES_Y, width: RULES_WIDTH, height: (topH * 1.002) / CC_H,
+        size: sharedSize, lineHeightMult: lhMult, minLineHeightMult: lhMult, oneLinePerRow: true, text: topMarkup,
       });
+    }
+    if (bottomSections.length) {
+      const bottomY = RULES_Y + (topH + gapPx) / CC_H;
+      const bottomTextObj = {
+        font: 'mplantin', y: bottomY, width: COLUMN_WIDTH, height: (bottomH * 1.002) / CC_H,
+        size: sharedSize, lineHeightMult: lhMult, minLineHeightMult: lhMult, oneLinePerRow: true,
+      };
+      await writeText(ctx, card, { ...bottomTextObj, x: RULES_X, text: leftMarkup });
+      await writeText(ctx, card, { ...bottomTextObj, x: RULES_X + COLUMN_WIDTH + COLUMN_GAP, text: rightMarkup });
     }
 
     // 6. Rounded corners
