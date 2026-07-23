@@ -12,7 +12,7 @@ import { register }          from './registry.js?v=1';
 import { loadImage, manaSrc, MANA_CODES, ensureFonts } from './assets.js?v=1';
 import { cutRoundedCorners } from './canvas-util.js?v=2';
 import { drawColorPips }     from './pips.js?v=1';
-import { buildSectionsMarkup, splitSectionsIntoColumns } from './markup.js?v=4';
+import { buildSectionsMarkup, splitSectionsIntoColumns } from './markup.js?v=5';
 import { writeText, fitText, scaleWidth, scaleHeight } from './text.js?v=5';
 import {
   CC_W, CC_H, frameSrc, drawFrames, drawWatermark,

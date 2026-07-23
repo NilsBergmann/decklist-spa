@@ -5,20 +5,25 @@
 
 // Builds markup for an explicit list of sections (a subset for a column, or
 // the full model.sections for a single-column layout). showBullet: false
-// omits the rarity-diamond bullet entirely — useful for Land/Token sections,
-// where rarity isn't meaningful info worth flagging.
+// omits the rarity-diamond bullet AND its tab-stop indentation entirely —
+// useful for Land/Token sections, where rarity isn't meaningful info worth
+// flagging and there's no bullet to align a name column against.
 export function buildSectionsMarkup(sections, { showBullet = true } = {}) {
   const lines = [];
   for (const section of sections) {
     lines.push(`{bold}${section.type} (${section.total}){/bold}`);
     for (const row of section.rows) {
+      if (!showBullet) {
+        const countPrefix = row.count > 1 ? `${row.count}x ` : '';
+        lines.push(`${countPrefix}${row.name} ${row.cost}`);
+        continue;
+      }
       // {rightN}: absolute tab-stop at N×fontSize/100 px from text-box left.
       // Diamond always at {right130}; count prefix sits at {right5}. Shared
       // tab-stop keeps every row's diamond in one aligned column regardless
       // of whether it has a count prefix.
       const prefix = row.count > 1 ? `{right5}${row.count}x{right130}` : `{right130}`;
-      const bullet = showBullet ? `{fontcolor${row.rarityHex}}◆ {fontcolor#000000}` : '';
-      lines.push(`${prefix}${bullet}${row.name} ${row.cost}`);
+      lines.push(`${prefix}{fontcolor${row.rarityHex}}◆ {fontcolor#000000}${row.name} ${row.cost}`);
     }
   }
   return lines.join('\\n');
