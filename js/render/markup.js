@@ -4,10 +4,10 @@
 // CC markup is generated for them).
 
 // Builds markup for an explicit list of sections (a subset for a column, or
-// the full model.sections for a single-column layout). showRarity: false
-// drops the diamond's rarity color-coding (plain black instead) — useful for
-// Land/Token sections, where rarity isn't meaningful info worth flagging.
-export function buildSectionsMarkup(sections, { showRarity = true } = {}) {
+// the full model.sections for a single-column layout). showBullet: false
+// omits the rarity-diamond bullet entirely — useful for Land/Token sections,
+// where rarity isn't meaningful info worth flagging.
+export function buildSectionsMarkup(sections, { showBullet = true } = {}) {
   const lines = [];
   for (const section of sections) {
     lines.push(`{bold}${section.type} (${section.total}){/bold}`);
@@ -17,8 +17,8 @@ export function buildSectionsMarkup(sections, { showRarity = true } = {}) {
       // tab-stop keeps every row's diamond in one aligned column regardless
       // of whether it has a count prefix.
       const prefix = row.count > 1 ? `{right5}${row.count}x{right130}` : `{right130}`;
-      const diamondHex = showRarity ? row.rarityHex : '#000000';
-      lines.push(`${prefix}{fontcolor${diamondHex}}◆ {fontcolor#000000}${row.name} ${row.cost}`);
+      const bullet = showBullet ? `{fontcolor${row.rarityHex}}◆ {fontcolor#000000}` : '';
+      lines.push(`${prefix}${bullet}${row.name} ${row.cost}`);
     }
   }
   return lines.join('\\n');
