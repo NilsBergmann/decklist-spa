@@ -2,8 +2,9 @@
 // Wires the control panel; delegates rendering to cards-ui.js.
 // Side-effect import of m15.js registers the renderer before any render call.
 
-import './render/m15.js?v=2';          // registers m15 renderer
-import './render/art-bg.js?v=2';       // registers art-background renderer
+import './render/m15.js?v=5';          // registers m15 renderer
+import './render/m15-2col.js?v=5';     // registers m15 2-column renderer
+import './render/art-bg.js?v=4';       // registers art-background renderer
 import './render/cover.js?v=2';        // registers cover-card renderer
 
 import { list as listRenderers }  from './render/registry.js?v=1';
