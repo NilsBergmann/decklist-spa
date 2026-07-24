@@ -3,7 +3,7 @@
 // no coords, no font names, no CC markup tokens.
 
 import { WUBRG, RARITY_ORDER, RARITY_HEX } from './config.js?v=3';
-import { resolveWatermark } from './watermarks.js?v=5';
+import { resolveWatermark } from './watermarks.js?v=6';
 import { splitTitleSubtitle } from './text-utils.js?v=2';
 import {
   groupByType, groupDuplicates, sortTypes, isPureHybridCard,

@@ -145,6 +145,77 @@ textarea:focus {
 
 select option { background: #2d2d2d; }
 
+/* ── WATERMARK COMBOBOX (searchable set picker) ─────────── */
+
+.wm-combo {
+  position: relative;
+}
+
+.wm-combo-input {
+  cursor: text;
+}
+
+.wm-combo-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: #2d2d2d;
+  border: 1px solid #444;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.wm-combo-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #e0e0e0;
+}
+
+.wm-combo-option:hover,
+.wm-combo-option.active {
+  background: #3b3b3b;
+}
+
+.wm-combo-option.selected {
+  color: #7db4ff;
+}
+
+.wm-combo-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  object-fit: contain;
+  filter: invert(1) brightness(1.4);
+}
+
+.wm-combo-icon--blank {
+  display: inline-block;
+}
+
+.wm-combo-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wm-combo-empty {
+  padding: 9px;
+  font-size: 13px;
+  color: #888;
+}
+
 /* Inline checkbox row */
 .inline-check {
   display: flex;

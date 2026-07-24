@@ -8,12 +8,13 @@ import './render/art-bg.js?v=20';      // registers art-background renderer
 import './render/cover.js?v=3';        // registers cover-card renderer
 
 import { list as listRenderers }  from './render/registry.js?v=1';
-import { getWatermarks, loadWatermarkSets } from './watermarks.js?v=5';
+import { getWatermarks, loadWatermarkSets } from './watermarks.js?v=6';
+import { createWatermarkCombobox } from './watermark-combobox.js?v=2';
 import {
   extractCubeId, fetchCubeData, parseDecks,
   listCachedIds, parseManualDeck, parseDeckYaml,
 } from './cube-source.js?v=40';
-import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases, openBatchEdit, hasCards } from './cards-ui.js?v=61';
+import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases, openBatchEdit, hasCards } from './cards-ui.js?v=62';
 import { setStatus } from './status.js?v=1';
 
 // ── DOM REFERENCES ────────────────────────────────────────────────────────────
@@ -46,15 +47,18 @@ function saveSettings(patch) {
   } catch {}
 }
 
-// ── WATERMARK DROPDOWN ────────────────────────────────────────────────────────
+// ── WATERMARK COMBOBOX ────────────────────────────────────────────────────────
+// Searchable set picker (icon + name, filtered by typing) standing in for a
+// plain <select> — the set list runs to 150+ entries. Exposes the same
+// value/options/addEventListener('change') surface a <select> would, so the
+// rest of this file's wiring below doesn't need to know the difference.
 
-const wmSelect = document.getElementById('watermark');
+const wmSelect = createWatermarkCombobox(document.getElementById('watermarkCombo'));
 function buildWatermarkOptions(selected = 'fdn') {
-  wmSelect.innerHTML = Object.entries(getWatermarks())
-    .map(([k, v]) => `<option value="${k}"${k === selected ? ' selected' : ''}>${v.label}</option>`)
-    .join('');
+  const items = Object.entries(getWatermarks()).map(([k, v]) => ({ key: k, label: v.label, image: v.image }));
+  wmSelect.setItems(items);
   // If the desired value isn't present, fall back to the always-available auto option.
-  if (![...wmSelect.options].some(o => o.value === selected)) wmSelect.value = 'set-color';
+  wmSelect.value = items.some(i => i.key === selected) ? selected : 'set-color';
 }
 buildWatermarkOptions();
 
@@ -85,7 +89,7 @@ function queueRerender(patch) {
 // them. Style changes skip this — switching styles while iterating on a
 // deck is common enough that the confirm was just friction.
 let wmValueBeforeFocus = wmSelect.value;
-wmSelect.addEventListener('focus', () => { wmValueBeforeFocus = wmSelect.value; });
+wmSelect.input.addEventListener('focus', () => { wmValueBeforeFocus = wmSelect.value; });
 
 function confirmDestructiveChange(select, previousValue, label) {
   if (!hasCards()) return true;
