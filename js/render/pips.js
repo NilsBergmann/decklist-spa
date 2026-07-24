@@ -6,7 +6,7 @@
 // 3+: full WUBRG row.
 
 import { loadImage, manaSrc, MANA_CODES } from './assets.js?v=1';
-import { GUILD_HYBRID }                    from '../config.js?v=2';
+import { GUILD_HYBRID }                    from '../config.js?v=3';
 
 export async function drawColorPips(ctx, card, model) {
   const id = model.colorIdentity;
@@ -33,7 +33,7 @@ export async function drawColorPips(ctx, card, model) {
   }
 
   const h    = card.height, w = card.width;
-  const pipH = Math.round(h * 0.028);
+  const pipH = Math.round(h * 0.028 * 1.5);   // +50% per request
   const gap  = Math.round(w * 0.006);
   const totalW = codes.length * pipH + Math.max(0, codes.length - 1) * gap;
 

@@ -2,19 +2,19 @@
 // buildDeckModel returns a plain data object with NO renderer-specific fields:
 // no coords, no font names, no CC markup tokens.
 
-import { WUBRG, RARITY_ORDER, RARITY_HEX } from './config.js?v=2';
-import { resolveWatermark } from './watermarks.js?v=3';
+import { WUBRG, RARITY_ORDER, RARITY_HEX } from './config.js?v=3';
+import { resolveWatermark } from './watermarks.js?v=5';
 import { splitTitleSubtitle } from './text-utils.js?v=2';
 import {
   groupByType, groupDuplicates, sortTypes, isPureHybridCard,
-  compareByCountThenRarity, compareByCountThenName,
-} from './card-utils.js?v=3';
+  compareLandSort, compareByCountThenName,
+} from './card-utils.js?v=4';
 
-// Land rows print highest-count-first (then rarity); Token rows print
-// highest-count-first (then alphabetical) — everything else keeps the
-// default rarity-only order.
+// Land rows print basics first, then highest-count-first (then rarity)
+// within each of those two groups; Token rows print highest-count-first
+// (then alphabetical) — everything else keeps the default rarity-only order.
 const ROW_COMPARE_BY_TYPE = {
-  Land: compareByCountThenRarity,
+  Land: compareLandSort,
   Token: compareByCountThenName,
 };
 

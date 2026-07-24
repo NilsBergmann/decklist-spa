@@ -3,8 +3,8 @@
 import {
   WUBRG, RARITY_ORDER,
   IGNORED_TAGS_SET, IGNORED_TAG_RE,
-} from './config.js?v=2';
-import { groupByType, groupDuplicates, sortTypes } from './card-utils.js?v=3';
+} from './config.js?v=3';
+import { groupByType, groupDuplicates, sortTypes } from './card-utils.js?v=4';
 
 // ── NORMALIZE RARITY ─────────────────────────────────────────────────────────
 
@@ -130,10 +130,13 @@ export function sanitizeParsedCost(parsedCost, cmc) {
 // Collapses type-bucket synonyms so cards land in one printed section
 // regardless of source (CubeCobra type line vs a manual-entry header):
 // Enchantment/Artifact → 'Artifacts & Enchantments', Instant/Sorcery →
-// 'Instants & Sorceries'.
+// 'Instants & Sorceries', Emblem → 'Token' (an emblem isn't cast and has no
+// rarity either — same non-card status as a token, so it gets the same
+// no-cost/no-bullet/alphabetical-sort treatment).
 function canonicalizeTypeBucket(base) {
   if (base.includes('Enchantment') || base.includes('Artifact')) return 'Artifacts & Enchantments';
   if (base.includes('Instant') || base.includes('Sorcery')) return 'Instants & Sorceries';
+  if (base.includes('Emblem')) return 'Token';
   return base;
 }
 

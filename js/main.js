@@ -2,18 +2,18 @@
 // Wires the control panel; delegates rendering to cards-ui.js.
 // Side-effect import of m15.js registers the renderer before any render call.
 
-import './render/m15.js?v=15';         // registers m15 renderer
-import './render/m15-2col.js?v=14';    // registers m15 2-column renderer
-import './render/art-bg.js?v=12';      // registers art-background renderer
-import './render/cover.js?v=2';        // registers cover-card renderer
+import './render/m15.js?v=26';         // registers m15 renderer
+import './render/m15-2col.js?v=25';    // registers m15 2-column renderer
+import './render/art-bg.js?v=20';      // registers art-background renderer
+import './render/cover.js?v=3';        // registers cover-card renderer
 
 import { list as listRenderers }  from './render/registry.js?v=1';
-import { getWatermarks, loadWatermarkSets } from './watermarks.js?v=3';
+import { getWatermarks, loadWatermarkSets } from './watermarks.js?v=5';
 import {
   extractCubeId, fetchCubeData, parseDecks,
   listCachedIds, parseManualDeck, parseDeckYaml,
-} from './cube-source.js?v=37';
-import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases, openBatchEdit, hasCards } from './cards-ui.js?v=56';
+} from './cube-source.js?v=40';
+import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases, openBatchEdit, hasCards } from './cards-ui.js?v=61';
 import { setStatus } from './status.js?v=1';
 
 // ── DOM REFERENCES ────────────────────────────────────────────────────────────
@@ -76,16 +76,16 @@ function queueRerender(patch) {
   renderChain = renderChain.then(() => rerenderAll(patch)).catch(() => {});
 }
 
-// Changing style/watermark after cards exist overwrites every card's current
-// look (including per-card overrides) with no undo — confirm before applying,
-// reverting the dropdown if the user backs out. The pre-change value is
-// captured on focus (right before the user opens the dropdown), so it stays
-// correct across programmatic value changes (restoreSettings, loadWatermarkSets)
-// without needing to be manually re-synced after each of them.
-let styleValueBeforeFocus = styleSelect.value;
-let wmValueBeforeFocus    = wmSelect.value;
-styleSelect.addEventListener('focus', () => { styleValueBeforeFocus = styleSelect.value; });
-wmSelect.addEventListener('focus',    () => { wmValueBeforeFocus    = wmSelect.value; });
+// Changing watermark after cards exist overwrites every card's current
+// watermark (including per-card overrides) with no undo — confirm before
+// applying, reverting the dropdown if the user backs out. The pre-change
+// value is captured on focus (right before the user opens the dropdown), so
+// it stays correct across programmatic value changes (restoreSettings,
+// loadWatermarkSets) without needing to be manually re-synced after each of
+// them. Style changes skip this — switching styles while iterating on a
+// deck is common enough that the confirm was just friction.
+let wmValueBeforeFocus = wmSelect.value;
+wmSelect.addEventListener('focus', () => { wmValueBeforeFocus = wmSelect.value; });
 
 function confirmDestructiveChange(select, previousValue, label) {
   if (!hasCards()) return true;
@@ -96,8 +96,6 @@ function confirmDestructiveChange(select, previousValue, label) {
 
 const ART_STYLES = new Set(['art-bg', 'cover']);
 styleSelect.addEventListener('change', () => {
-  if (!confirmDestructiveChange(styleSelect, styleValueBeforeFocus, 'the style')) return;
-  styleValueBeforeFocus = styleSelect.value;
   artUrlGroup.style.display = ART_STYLES.has(styleSelect.value) ? '' : 'none';
   saveSettings({ style: styleSelect.value });
   queueRerender({ styleKey: styleSelect.value });

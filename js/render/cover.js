@@ -6,7 +6,7 @@
 
 import { register }            from './registry.js?v=1';
 import { loadImage, manaSrc, ensureFonts } from './assets.js?v=1';
-import { COLOR_HEX, GUILD_HYBRID }         from '../config.js?v=2';
+import { COLOR_HEX, GUILD_HYBRID }         from '../config.js?v=3';
 import { cutRoundedCorners, drawCoverFitImage } from './canvas-util.js?v=2';
 
 const CC_W = 2010;
