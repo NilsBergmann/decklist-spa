@@ -29,3 +29,10 @@ export const GUILD_HYBRID = {
   WU: 'wu', WB: 'wb', WR: 'rw', WG: 'gw', UB: 'ub',
   UR: 'ur', UG: 'gu', BR: 'br', BG: 'bg', RG: 'rg',
 };
+
+// Shared style for every light section-divider rule drawn on a printed card
+// (the m15/m15-2col top/bottom vfill split in m15-shared.js, and the
+// per-heading {divider} rule in render/text.js) — kept in one place so the
+// two mechanisms can't drift apart visually.
+export const DIVIDER_COLOR = 'rgba(0,0,0,0.18)';
+export const DIVIDER_LINE_WIDTH_FRAC = 0.0015;   // fraction of card height

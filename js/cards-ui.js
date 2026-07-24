@@ -3,9 +3,9 @@
 // per-card watermark selector, single + batch PNG download, downsample helper.
 
 import { get as registryGet, list as registryList } from './render/registry.js?v=1';
-import { buildDeckModel }      from './deck-model.js?v=7';
-import { getWatermarks }       from './watermarks.js?v=3';
-import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=37';
+import { buildDeckModel }      from './deck-model.js?v=10';
+import { getWatermarks }       from './watermarks.js?v=5';
+import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=40';
 import { splitTitleSubtitle, mergeTitleSubtitle } from './text-utils.js?v=2';
 import { setStatus } from './status.js?v=1';
 import {
@@ -395,9 +395,10 @@ editColorSwap.addEventListener('click', () => {
 });
 
 // ── COLOR BLEND SLIDER (edit modal) ───────────────────────────────────────────
-// Styles where the two-color blend slider is meaningful (m15 frame/watermark
-// split is the primary effect of splitRatio).
-const MODAL_BLEND_STYLES = new Set(['m15']);
+// Styles where the two-color blend slider is meaningful (m15/m15-2col frame/
+// watermark split is the primary effect of splitRatio — both share the same
+// drawFrames/drawWatermark in m15-shared.js).
+const MODAL_BLEND_STYLES = new Set(['m15', 'm15-2col']);
 
 // Slider snap targets: every multiple of 10, plus 25/50/75.
 const BLEND_SNAP = [...Array.from({ length: 11 }, (_, i) => i * 10), 25, 50, 75]

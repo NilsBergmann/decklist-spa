@@ -6,12 +6,12 @@
 import { register }          from './registry.js?v=1';
 import { loadImage, manaSrc, MANA_CODES, ensureFonts } from './assets.js?v=1';
 import { cutRoundedCorners } from './canvas-util.js?v=2';
-import { drawColorPips }     from './pips.js?v=1';
-import { buildSectionsMarkup } from './markup.js?v=8';
-import { writeText, layoutText, scaleWidth, scaleHeight } from './text.js?v=8';
+import { drawColorPips }     from './pips.js?v=2';
+import { buildSectionsMarkup } from './markup.js?v=13';
+import { writeText, layoutText, scaleWidth, scaleHeight } from './text.js?v=13';
 import {
-  CC_W, CC_H, frameSrc, drawFrames, drawWatermark,
-} from './m15-shared.js?v=6';
+  CC_W, CC_H, frameSrc, drawFrames, drawWatermark, drawSectionDivider,
+} from './m15-shared.js?v=12';
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -29,6 +29,23 @@ const RULES_TEXTOBJ = {
   width:  0.826,   height: 0.800,
   size:   0.0362,
 };
+
+// RULES_TEXTOBJ's left/right margins aren't symmetric (0.100 vs 0.074 — its
+// right edge, 0.926, already sits at the smaller/correct margin from the
+// card edge) — background decoration (divider rules, zebra tint) widens to
+// these margins instead so it doesn't read as lopsided against the text's
+// own (asymmetric) tab-stops/wrapping width, which stay untouched.
+//
+// The frame art itself is ALSO asymmetric left vs right (confirmed by
+// pixel-sampling the rendered border with no watermark, which otherwise
+// masks it): the right border is ~149px wide at the card's 2010px render
+// width (matching the 0.074 mirrored margin below), but the left border is
+// only ~134px — so mirroring the right margin onto the left, as this used
+// to do, left a real ~15px gap of plain background between the left border
+// and the tint/divider. DECOR_X uses that measured value directly instead.
+const DECOR_RIGHT_MARGIN = 1 - (RULES_TEXTOBJ.x + RULES_TEXTOBJ.width);
+const DECOR_X     = 134 / CC_W;
+const DECOR_WIDTH = (1 - DECOR_RIGHT_MARGIN) - DECOR_X;
 
 // Squeeze leading before shrinking font size on overflow (same range as the
 // 2-column style). Land/Token sections are pushed down to sit flush against
@@ -93,8 +110,10 @@ const m15 = {
     const bottomSections = model.sections.filter(s => BOTTOM_TYPES.has(s.type));
     const hasBoth = topSections.length && bottomSections.length;
 
-    const topMarkup    = topSections.length    ? buildSectionsMarkup(topSections)    : '';
-    const bottomMarkup = bottomSections.length ? buildSectionsMarkup(bottomSections) : '';
+    // Halved tab-stop (65 vs the 130 default), matching the 2-column style's
+    // tighter bullet/name indentation.
+    const topMarkup    = topSections.length    ? buildSectionsMarkup(topSections, { tabStop: 65 })    : '';
+    const bottomMarkup = bottomSections.length ? buildSectionsMarkup(bottomSections, { tabStop: 65 }) : '';
 
     const boxWidthPx  = scaleWidth(RULES_TEXTOBJ.width, card);
     const boxHeightPx = scaleHeight(RULES_TEXTOBJ.height, card);
@@ -135,15 +154,21 @@ const m15 = {
     if (topSections.length) {
       await writeText(ctx, card, {
         ...RULES_TEXTOBJ, height: (topH * 1.002) / CC_H, size: sharedSize,
-        lineHeightMult: lhMult, minLineHeightMult: lhMult, oneLinePerRow: true, text: topMarkup,
+        lineHeightMult: lhMult, minLineHeightMult: lhMult, oneLinePerRow: true,
+        zebraTint: true, decorX: DECOR_X, decorWidth: DECOR_WIDTH, text: topMarkup,
       });
     }
     if (bottomSections.length) {
       await writeText(ctx, card, {
         ...RULES_TEXTOBJ, y: RULES_TEXTOBJ.y + (topH + gapPx) / CC_H,
         height: (bottomH * 1.002) / CC_H, size: sharedSize,
-        lineHeightMult: lhMult, minLineHeightMult: lhMult, oneLinePerRow: true, text: bottomMarkup,
+        lineHeightMult: lhMult, minLineHeightMult: lhMult, oneLinePerRow: true,
+        zebraTint: true, decorX: DECOR_X, decorWidth: DECOR_WIDTH, text: bottomMarkup,
       });
+    }
+    if (hasBoth) {
+      const dividerY = RULES_TEXTOBJ.y + (topH + gapPx / 2) / CC_H;
+      drawSectionDivider(ctx, card, DECOR_X, dividerY, DECOR_WIDTH);
     }
 
     // 6. Rounded corners

@@ -5,11 +5,11 @@
 
 import { register }            from './registry.js?v=1';
 import { loadImage, ensureFonts } from './assets.js?v=1';
-import { COLOR_HEX }           from '../config.js?v=2';
+import { COLOR_HEX }           from '../config.js?v=3';
 import { cutRoundedCorners, roundRectPath, drawCoverFitImage } from './canvas-util.js?v=2';
-import { drawColorPips }       from './pips.js?v=1';
-import { buildTextMarkup }     from './markup.js?v=8';
-import { writeText }           from './text.js?v=8';
+import { drawColorPips }       from './pips.js?v=2';
+import { buildTextMarkup }     from './markup.js?v=13';
+import { writeText }           from './text.js?v=13';
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -173,7 +173,7 @@ const artBg = {
     drawSeparator(ctx, CC_W, CC_H, model);
 
     // 6. Rules text
-    await writeText(ctx, card, { ...RULES_TEXTOBJ, text: buildTextMarkup(model) });
+    await writeText(ctx, card, { ...RULES_TEXTOBJ, zebraTint: true, text: buildTextMarkup(model) });
 
     // 7. Rounded corners
     cutRoundedCorners(ctx, CC_W, CC_H);

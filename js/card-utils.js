@@ -2,7 +2,7 @@
 // Used by both the render path (deck-model.js) and the edit-modal/YAML text
 // paths (cube-source.js), so a fix here reaches every caller.
 
-import { TYPE_ORDER, RARITY_ORDER } from './config.js?v=2';
+import { TYPE_ORDER, RARITY_ORDER } from './config.js?v=3';
 
 export function groupByType(cards) {
   const g = {};
@@ -18,6 +18,18 @@ function compareByRarity(a, b) {
 // section, where "how many copies" is the more useful ordering signal.
 export function compareByCountThenRarity(a, b) {
   return b.count - a.count || compareByRarity(a, b);
+}
+
+const BASIC_LAND_NAMES = new Set(['Plains', 'Island', 'Swamp', 'Mountain', 'Forest', 'Wastes']);
+
+// Basic lands (Plains/Island/Swamp/Mountain/Forest/Wastes) always print
+// before every other land, then compareByCountThenRarity orders within each
+// of those two groups.
+export function compareLandSort(a, b) {
+  const aBasic = BASIC_LAND_NAMES.has(a.card.name);
+  const bBasic = BASIC_LAND_NAMES.has(b.card.name);
+  if (aBasic !== bBasic) return aBasic ? -1 : 1;
+  return compareByCountThenRarity(a, b);
 }
 
 // Highest count first, alphabetical as the tiebreak — used for the printed

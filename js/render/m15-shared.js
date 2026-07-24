@@ -4,7 +4,8 @@
 // itself (title/rules boxes, column count) stays per-renderer.
 
 import { loadImage } from './assets.js?v=1';
-import { scaleX, scaleY, scaleWidth, scaleHeight } from './text.js?v=8';
+import { scaleX, scaleY, scaleWidth, scaleHeight } from './text.js?v=13';
+import { DIVIDER_COLOR, DIVIDER_LINE_WIDTH_FRAC } from '../config.js?v=3';
 
 export const CC_W = 2010;
 export const CC_H = 2814;
@@ -86,5 +87,22 @@ export async function drawWatermark(ctx, card, model) {
   ctx.save();
   ctx.globalAlpha = WATERMARK_OPACITY;
   ctx.drawImage(tmp, 0, 0);
+  ctx.restore();
+}
+
+// A light horizontal rule across the vfill gap between the spell block and
+// the land/token block. xFrac/widthFrac/yFrac are fractional card
+// coordinates, same convention as everything else here.
+export function drawSectionDivider(ctx, card, xFrac, yFrac, widthFrac) {
+  const x0 = scaleX(xFrac, card);
+  const y  = scaleY(yFrac, card);
+  const w  = scaleWidth(widthFrac, card);
+  ctx.save();
+  ctx.strokeStyle = DIVIDER_COLOR;
+  ctx.lineWidth = Math.max(1, Math.round(scaleHeight(DIVIDER_LINE_WIDTH_FRAC, card)));
+  ctx.beginPath();
+  ctx.moveTo(x0, y);
+  ctx.lineTo(x0 + w, y);
+  ctx.stroke();
   ctx.restore();
 }

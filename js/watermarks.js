@@ -1,6 +1,6 @@
 // ── WATERMARKS + WATERMARK RESOLUTION ───────────────────────────────────────
 
-import { COLOR_HEX } from './config.js?v=2';
+import { COLOR_HEX } from './config.js?v=3';
 
 export const SF = code => `https://svgs.scryfall.io/sets/${code}.svg`;
 
@@ -132,8 +132,14 @@ export async function loadWatermarkSets() {
       const r = await fetch('https://api.scryfall.com/sets');
       if (!r.ok) return _current;
       const d = await r.json();
+      // 'draft_innovation' covers cube-relevant supplemental sets Scryfall
+      // doesn't file as core/expansion — Jumpstart/Jumpstart 2022/Foundations
+      // Jumpstart, Modern Horizons, Battlebond, Conspiracy, etc. Without it,
+      // e.g. j25 (Foundations Jumpstart) never appears in the dropdown no
+      // matter how long the cache is refreshed.
+      const WATERMARK_SET_TYPES = new Set(['core', 'expansion', 'draft_innovation']);
       sets = (d.data ?? [])
-        .filter(s => (s.set_type === 'core' || s.set_type === 'expansion') && !s.digital)
+        .filter(s => WATERMARK_SET_TYPES.has(s.set_type) && !s.digital)
         .sort((a, b) => (b.released_at ?? '').localeCompare(a.released_at ?? ''))
         .map(s => ({ code: s.code, name: s.name, icon: s.icon_svg_uri }));
       if (!sets.length) return _current;
