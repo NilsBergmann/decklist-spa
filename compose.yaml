@@ -6,4 +6,4 @@ services:
       - .:/app
     ports:
       - "8787:8080"
-    command: python -m http.server 8080
+    command: python serve.py

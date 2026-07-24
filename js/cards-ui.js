@@ -3,8 +3,8 @@
 // per-card watermark selector, single + batch PNG download, downsample helper.
 
 import { get as registryGet, list as registryList } from './render/registry.js?v=1';
-import { buildDeckModel }      from './deck-model.js?v=10';
-import { getWatermarks }       from './watermarks.js?v=5';
+import { buildDeckModel }      from './deck-model.js?v=11';
+import { getWatermarks }       from './watermarks.js?v=6';
 import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=40';
 import { splitTitleSubtitle, mergeTitleSubtitle } from './text-utils.js?v=2';
 import { setStatus } from './status.js?v=1';

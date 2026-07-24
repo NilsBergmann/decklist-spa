@@ -136,8 +136,12 @@ export async function loadWatermarkSets() {
       // doesn't file as core/expansion — Jumpstart/Jumpstart 2022/Foundations
       // Jumpstart, Modern Horizons, Battlebond, Conspiracy, etc. Without it,
       // e.g. j25 (Foundations Jumpstart) never appears in the dropdown no
-      // matter how long the cache is refreshed.
-      const WATERMARK_SET_TYPES = new Set(['core', 'expansion', 'draft_innovation']);
+      // matter how long the cache is refreshed. 'commander' covers the
+      // precon Commander decks Scryfall files separately from their parent
+      // set (e.g. "Foundations Commander", "Aetherdrift Commander"), and
+      // 'eternal' covers the Eternal-format reprint sets (e.g. "Avatar: The
+      // Last Airbender Eternal").
+      const WATERMARK_SET_TYPES = new Set(['core', 'expansion', 'draft_innovation', 'commander', 'eternal']);
       sets = (d.data ?? [])
         .filter(s => WATERMARK_SET_TYPES.has(s.set_type) && !s.digital)
         .sort((a, b) => (b.released_at ?? '').localeCompare(a.released_at ?? ''))

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Decklist Generator</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=1">
 </head>
 <body>
   <div id="controls">
@@ -54,8 +54,12 @@
     </div>
 
     <div class="form-group">
-      <label for="watermark">Watermark</label>
-      <select id="watermark"></select>
+      <label for="watermarkInput">Watermark</label>
+      <div class="wm-combo" id="watermarkCombo">
+        <input type="text" id="watermarkInput" class="wm-combo-input" placeholder="Search sets…" autocomplete="off"
+               role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="watermarkListbox">
+        <ul class="wm-combo-list" id="watermarkListbox" role="listbox" hidden></ul>
+      </div>
     </div>
 
     <!-- A2: Page size -->
@@ -202,6 +206,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/main.js?v=86"></script>
+  <script type="module" src="js/main.js?v=89"></script>
 </body>
 </html>
