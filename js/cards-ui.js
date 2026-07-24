@@ -8,6 +8,7 @@ import { getWatermarks }       from './watermarks.js?v=6';
 import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=40';
 import { splitTitleSubtitle, mergeTitleSubtitle } from './text-utils.js?v=2';
 import { setStatus } from './status.js?v=1';
+import { createZipBlob } from './zip.js?v=1';
 import {
   clear as clearState, push as pushState,
   get as getState, update as updateState, getAll as getAllState,
@@ -163,18 +164,51 @@ async function downloadCell(index) {
   disposeCanvas(canvas);
 }
 
+function canvasToPngBytes(canvas) {
+  return new Promise(resolve => {
+    canvas.toBlob(async blob => resolve(blob ? new Uint8Array(await blob.arrayBuffer()) : null), 'image/png');
+  });
+}
+
+// De-duplicates a base filename against names already used in this batch
+// (e.g. two decks sharing a name) by appending "-2", "-3", ... as needed.
+function uniqueFileName(base, usedNames) {
+  let name = base;
+  let n = 2;
+  while (usedNames.has(name)) { name = `${base}-${n}`; n++; }
+  usedNames.add(name);
+  return name;
+}
+
 // Re-render each card full-res one at a time so peak memory stays at a single
-// full-res canvas rather than holding all of them at once.
+// full-res canvas rather than holding all of them at once, then bundle every
+// PNG into one zip — downloading N loose files one-by-one either gets
+// throttled or triggers a "this site is trying to download multiple files"
+// prompt in most browsers.
 export async function downloadAll() {
   const all = getAllState();
+  const usedNames = new Set();
+  const files = [];
   for (let i = 0; i < all.length; i++) {
     let canvas;
     try { canvas = await renderFullRes(i); }
     catch (err) { setStatus(`Render error on card ${i + 1}: ${err.message}`, 'error'); return; }
     if (!canvas) continue;
-    downloadCanvas(canvas, cardFileName(all[i], i));
+    const bytes = await canvasToPngBytes(canvas);
     disposeCanvas(canvas);
+    if (!bytes) continue;
+    const name = uniqueFileName(cardFileName(all[i], i), usedNames);
+    files.push({ name: `${name}.png`, data: bytes });
   }
+  if (!files.length) return;
+
+  const zipBlob = createZipBlob(files);
+  const url = URL.createObjectURL(zipBlob);
+  const a = document.createElement('a');
+  a.download = 'decklist-cards.zip';
+  a.href = url;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // D1: export all current decks as a single YAML file
