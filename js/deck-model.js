@@ -8,12 +8,12 @@ import { splitTitleSubtitle } from './text-utils.js?v=2';
 import {
   groupByType, groupDuplicates, sortTypes, isPureHybridCard,
   compareLandSort, compareByCountThenName,
-} from './card-utils.js?v=4';
+} from './card-utils.js?v=5';
 
 // Land rows print basics first, then highest-count-first (then rarity)
 // within each of those two groups; Token rows print highest-count-first
 // (then alphabetical) — everything else keeps the default rarity-only order.
-const ROW_COMPARE_BY_TYPE = {
+export const ROW_COMPARE_BY_TYPE = {
   Land: compareLandSort,
   Token: compareByCountThenName,
 };
@@ -133,10 +133,12 @@ export function buildDeckModel(deck, wmKey, artOverride, opts = {}) {
   const typeGroups  = groupByType(deck.cards);
   const sortedTypes = sortTypes(Object.keys(typeGroups));
 
+  // opts.autoSort === false: the deck's own card order wins (set by the edit
+  // modal's manual drag-reorder) instead of the usual rarity/land/token sort.
   const sections = [];
   for (const type of sortedTypes) {
     if (type === 'Other') continue;
-    const dupes = groupDuplicates(typeGroups[type], ROW_COMPARE_BY_TYPE[type]);
+    const dupes = groupDuplicates(typeGroups[type], opts.autoSort === false ? null : ROW_COMPARE_BY_TYPE[type]);
     sections.push({
       type,
       total: typeGroups[type].length,

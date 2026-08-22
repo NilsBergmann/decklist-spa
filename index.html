@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Decklist Generator</title>
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
   <div id="controls">
@@ -115,6 +115,10 @@
       </div>
       <div class="modal-body">
         <div class="modal-main">
+          <div class="modal-field">
+            <label for="editTitle">Title</label>
+            <input id="editTitle" type="text" placeholder="Deck">
+          </div>
           <!-- Per-card fields: shown only for styles that use them -->
           <div id="editSubtitleGroup" class="modal-field" style="display:none">
             <label for="editSubtitle">Subtitle</label>
@@ -165,7 +169,16 @@
               <button id="editColorSwap" class="art-reset-btn color-swap-btn" type="button" style="display:none" title="Swap color order (which one leads)" aria-label="Swap color order">⇄</button>
             </div>
           </div>
-          <textarea id="editTextarea" spellcheck="false"></textarea>
+          <div class="modal-field edit-cards-field">
+            <div class="edit-cards-header">
+              <label>Cards</label>
+              <label class="auto-sort-toggle">
+                <input type="checkbox" id="editAutoSort" checked>
+                Auto sort
+              </label>
+            </div>
+            <div id="editCardTables" class="edit-card-tables"></div>
+          </div>
         </div>
         <div class="modal-preview">
           <div class="modal-preview-label">Live preview</div>
@@ -212,6 +225,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/main.js?v=93"></script>
+  <script type="module" src="js/main.js?v=94"></script>
 </body>
 </html>

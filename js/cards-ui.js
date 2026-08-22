@@ -3,12 +3,14 @@
 // per-card watermark selector, single + batch PNG download, downsample helper.
 
 import { get as registryGet, list as registryList } from './render/registry.js?v=1';
-import { buildDeckModel }      from './deck-model.js?v=11';
+import { buildDeckModel, ROW_COMPARE_BY_TYPE } from './deck-model.js?v=12';
 import { getWatermarks }       from './watermarks.js?v=6';
-import { parseManualDeck, deckToManualText, decksToYaml, resolveArtUrl, searchScryfallArt } from './cube-source.js?v=43';
+import { decksToYaml, resolveArtUrl, searchScryfallArt, enrichCardsFromScryfall, colorsFromCost } from './cube-source.js?v=44';
 import { splitTitleSubtitle, mergeTitleSubtitle } from './text-utils.js?v=2';
 import { setStatus } from './status.js?v=1';
 import { createZipBlob } from './zip.js?v=1';
+import { groupByType, groupDuplicates, compareByRarity } from './card-utils.js?v=5';
+import { TYPE_ORDER, RARITY_ORDER } from './config.js?v=3';
 import {
   clear as clearState, push as pushState,
   get as getState, update as updateState, getAll as getAllState,
@@ -63,7 +65,7 @@ export async function renderOneCell(index) {
   const entry = getState(index);
   if (!entry) return;
   const artOverride = await resolveArtUrl(entry.artOverride ?? '');
-  const model = buildDeckModel(entry.deck, entry.wmKey, artOverride, { colorOverride: entry.colorOverride, blendRatio: entry.blendRatio, artTransform: entry.artTransform });
+  const model = buildDeckModel(entry.deck, entry.wmKey, artOverride, { colorOverride: entry.colorOverride, blendRatio: entry.blendRatio, artTransform: entry.artTransform, autoSort: entry.autoSort });
   updateState(index, { model });
   const tmp = await renderFullRes(index);
   if (!tmp) return;
@@ -122,6 +124,7 @@ export async function renderDecks(decks, wmKey, styleKey = 'm15', artOverride = 
       colorOverride: s.colorOverride ?? null,
       blendRatio:    s.blendRatio ?? null,
       artTransform:  s.artTransform ?? { x: 0, y: 0, zoom: 1 },
+      autoSort:      s.autoSort ?? true,
       model: null, cell,
     });
     addCardOverlay(cell, i);
@@ -133,7 +136,7 @@ export async function renderDecks(decks, wmKey, styleKey = 'm15', artOverride = 
   await Promise.all(decks.map(async (deck, i) => {
     const entry = getState(i);
     const resolvedArt = await resolveArtUrl(entry.artOverride);
-    updateState(i, { model: buildDeckModel(deck, entry.wmKey, resolvedArt, { colorOverride: entry.colorOverride, blendRatio: entry.blendRatio, artTransform: entry.artTransform }) });
+    updateState(i, { model: buildDeckModel(deck, entry.wmKey, resolvedArt, { colorOverride: entry.colorOverride, blendRatio: entry.blendRatio, artTransform: entry.artTransform, autoSort: entry.autoSort }) });
     const tmp = await renderFullRes(i);
     if (!tmp) return;
     downsample(tmp, cells[i].querySelector('.card--screen'));
@@ -319,7 +322,9 @@ async function openFullscreen(index) {
 
 const editModal           = document.getElementById('editModal');
 const editModalStatus     = document.getElementById('editModalStatus');
-const editTextarea        = document.getElementById('editTextarea');
+const editTitleInput      = document.getElementById('editTitle');
+const editAutoSort        = document.getElementById('editAutoSort');
+const editCardTables      = document.getElementById('editCardTables');
 const editSubtitleGroup   = document.getElementById('editSubtitleGroup');
 const editSubtitleInput   = document.getElementById('editSubtitle');
 const editArtUrlGroup     = document.getElementById('editArtUrlGroup');
@@ -636,6 +641,314 @@ editArtUrlInput.addEventListener('input', () => {
   scheduleCardPreview();
 });
 
+// ── PER-CARD TABLE EDITING ────────────────────────────────────────────────────
+// Replaces the old free-text textarea: one table per TYPE_ORDER bucket, each
+// row a real object carried through the whole editing session (so e.g. a
+// card's `art` just stays attached unless the row itself is removed — no more
+// text round-trip + name-matching to recover it). _editRows is the working
+// copy; nothing is written back to state.js until Re-render is clicked.
+
+let _editRows   = [];   // [{ rowId, type, count, name, cost, rarity, art }]
+let _editRowSeq = 0;
+
+function rowsForType(type) {
+  return _editRows.filter(r => r.type === type);
+}
+
+// Seeds _editRows from a deck's flat card list, grouping duplicates into one
+// row per unique name (like the old manual-text format did). Sorted per
+// ROW_COMPARE_BY_TYPE/rarity when autoSort !== false; otherwise the deck's
+// own existing card order is preserved as-is.
+function buildEditRowsFromDeck(deck, autoSort) {
+  const typeGroups = groupByType(deck.cards);
+  const rows = [];
+  for (const type of TYPE_ORDER) {
+    const cards = typeGroups[type];
+    if (!cards) continue;
+    const compare = autoSort === false ? null : ROW_COMPARE_BY_TYPE[type];
+    for (const { card, count } of groupDuplicates(cards, compare)) {
+      rows.push({ rowId: ++_editRowSeq, type, count, name: card.name, cost: card.cost, rarity: card.rarity, art: card.art ?? null });
+    }
+  }
+  return rows;
+}
+
+// Re-sorts one type's rows using the exact comparator buildDeckModel would
+// apply with autoSort left on — used when the "Auto sort" checkbox is
+// re-checked, so what's on screen matches what Re-render will produce.
+// (Not groupDuplicates: that also merges same-named rows, which would be a
+// surprising side effect of just clicking a sort checkbox.)
+function resortRowsForType(type) {
+  const compare = ROW_COMPARE_BY_TYPE[type] ?? compareByRarity;
+  return rowsForType(type)
+    .map(row => ({ card: row, count: row.count }))
+    .sort(compare)
+    .map(({ card }) => card);
+}
+
+function resortAllEditRows() {
+  _editRows = TYPE_ORDER.flatMap(resortRowsForType);
+}
+
+// Flattens _editRows back into a real deck.cards list (count copies each,
+// colors re-derived from the cost field exactly like the old manual-format
+// parser did) plus the title field. Shared by the live preview and Save.
+function buildDeckFromEditRows() {
+  const cards = [];
+  for (const row of _editRows) {
+    const colors = colorsFromCost(row.cost ?? '');
+    for (let i = 0; i < row.count; i++) {
+      cards.push({ name: row.name, type: row.type, rarity: row.rarity, cost: row.cost ?? '', colors: [...colors], art: row.art ?? null });
+    }
+  }
+  return { name: editTitleInput.value.trim() || 'Deck', cards };
+}
+
+// Drag-and-drop: a row's handle carries its rowId; dropping onto another row
+// (same or different type table) splices it to that position and adopts the
+// target's type. Dropping directly on a table (not a row — including an
+// empty table) appends to the end of that type instead (wired per-table in
+// renderEditCardTables). Either path uncheck "Auto sort" — an explicit
+// re-order is exactly the "this" the checkbox exists to reflect.
+function moveEditRowBeforeTarget(draggedId, targetId, targetType) {
+  const fromIdx = _editRows.findIndex(r => r.rowId === draggedId);
+  if (fromIdx < 0) return;
+  const [moved] = _editRows.splice(fromIdx, 1);
+  moved.type = targetType;
+  let toIdx = _editRows.findIndex(r => r.rowId === targetId);
+  if (toIdx < 0) toIdx = _editRows.length;
+  _editRows.splice(toIdx, 0, moved);
+}
+
+function moveEditRowToEndOfType(draggedId, targetType) {
+  const fromIdx = _editRows.findIndex(r => r.rowId === draggedId);
+  if (fromIdx < 0) return;
+  const [moved] = _editRows.splice(fromIdx, 1);
+  moved.type = targetType;
+  _editRows.push(moved);
+}
+
+function afterEditRowsReordered() {
+  editAutoSort.checked = false;
+  renderEditCardTables();
+  scheduleCardPreview();
+}
+
+function wireEditRowDrag(tr, handle, row) {
+  handle.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', String(row.rowId));
+    e.dataTransfer.effectAllowed = 'move';
+    tr.classList.add('edit-card-row--dragging');
+  });
+  handle.addEventListener('dragend', () => tr.classList.remove('edit-card-row--dragging'));
+
+  // Same-table reorder only — cross-table moves stay drag-only, matching the
+  // main grid's reorder handle (cards-ui.js addCardOverlay) which is also
+  // keyboard-operable only within its one list.
+  handle.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault();
+    const siblings = rowsForType(row.type);
+    const idx = siblings.findIndex(r => r.rowId === row.rowId);
+    const targetIdx = idx + (e.key === 'ArrowUp' ? -1 : 1);
+    if (targetIdx < 0 || targetIdx >= siblings.length) return;
+    if (targetIdx === siblings.length - 1 && idx < targetIdx) {
+      moveEditRowToEndOfType(row.rowId, row.type);
+    } else {
+      moveEditRowBeforeTarget(row.rowId, siblings[targetIdx].rowId, row.type);
+    }
+    afterEditRowsReordered();
+    editCardTables.querySelector(`[data-row-id="${row.rowId}"] .edit-card-handle`)?.focus();
+  });
+
+  tr.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+  tr.addEventListener('drop', e => {
+    e.preventDefault();
+    e.stopPropagation();   // don't also trigger the table's append-to-end drop handler
+    const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
+    if (Number.isNaN(draggedId) || draggedId === row.rowId) return;
+    moveEditRowBeforeTarget(draggedId, row.rowId, row.type);
+    afterEditRowsReordered();
+  });
+}
+
+function buildEditRowEl(row) {
+  const tr = document.createElement('tr');
+  tr.className = 'edit-card-row';
+  tr.dataset.rowId = String(row.rowId);
+
+  const handleTd = document.createElement('td');
+  handleTd.className = 'edit-card-handle-cell';
+  const handle = document.createElement('span');
+  handle.className = 'card-drag-handle edit-card-handle';
+  handle.title = 'Drag to reorder or move to another table (or focus and press ↑ / ↓)';
+  handle.setAttribute('aria-label', 'Reorder or move card. Drag, or use up and down arrow keys.');
+  handle.setAttribute('role', 'button');
+  handle.tabIndex = 0;
+  handle.textContent = '⠿';
+  handle.draggable = true;
+  handleTd.appendChild(handle);
+
+  const countTd = document.createElement('td');
+  const countInput = document.createElement('input');
+  countInput.type = 'number'; countInput.min = '1'; countInput.className = 'edit-card-count';
+  countInput.value = String(row.count);
+  countInput.setAttribute('aria-label', 'Count');
+  countTd.appendChild(countInput);
+
+  const nameTd = document.createElement('td');
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text'; nameInput.className = 'edit-card-name';
+  nameInput.value = row.name;
+  nameInput.setAttribute('aria-label', 'Card name');
+  nameTd.appendChild(nameInput);
+
+  const costTd = document.createElement('td');
+  const costInput = document.createElement('input');
+  costInput.type = 'text'; costInput.className = 'edit-card-cost';
+  costInput.placeholder = '{2}{w}{w}';
+  costInput.value = row.cost ?? '';
+  costInput.setAttribute('aria-label', 'Mana cost');
+  costTd.appendChild(costInput);
+
+  const rarityTd = document.createElement('td');
+  const raritySel = document.createElement('select');
+  raritySel.className = 'edit-card-rarity';
+  raritySel.setAttribute('aria-label', 'Rarity');
+  for (const r of RARITY_ORDER) {
+    const opt = document.createElement('option');
+    opt.value = r; opt.textContent = r[0].toUpperCase() + r.slice(1);
+    if (r === row.rarity) opt.selected = true;
+    raritySel.appendChild(opt);
+  }
+  rarityTd.appendChild(raritySel);
+
+  const removeTd = document.createElement('td');
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button'; removeBtn.className = 'edit-card-remove';
+  removeBtn.title = 'Remove card'; removeBtn.setAttribute('aria-label', `Remove ${row.name}`);
+  removeBtn.textContent = '✕';
+  removeTd.appendChild(removeBtn);
+
+  tr.append(handleTd, countTd, nameTd, costTd, rarityTd, removeTd);
+
+  countInput.addEventListener('input', () => {
+    row.count = Math.max(1, parseInt(countInput.value, 10) || 1);
+    scheduleCardPreview();
+  });
+  nameInput.addEventListener('input', () => { row.name = nameInput.value; scheduleCardPreview(); });
+  costInput.addEventListener('input', () => { row.cost = costInput.value; scheduleCardPreview(); });
+  raritySel.addEventListener('change', () => { row.rarity = raritySel.value; scheduleCardPreview(); });
+  removeBtn.addEventListener('click', () => {
+    _editRows = _editRows.filter(r => r.rowId !== row.rowId);
+    renderEditCardTables();
+    scheduleCardPreview();
+  });
+
+  wireEditRowDrag(tr, handle, row);
+  return tr;
+}
+
+// Name-only "add a card" row at the bottom of each type table. Resolves cost/
+// rarity/art via Scryfall (same enrichCardsFromScryfall Manual-mode Generate
+// uses) but — per the user's call — a lookup miss still adds the row (blank
+// cost/rarity/art) instead of rejecting it, so it can be filled in by hand.
+function buildAddCardRow(type) {
+  const tr = document.createElement('tr');
+  tr.className = 'edit-card-addrow';
+  const td = document.createElement('td');
+  td.colSpan = 6;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'edit-card-add-input';
+  input.placeholder = 'Add card by name…';
+  input.setAttribute('aria-label', `Add card to ${type}`);
+  td.appendChild(input);
+  tr.appendChild(td);
+
+  let committing = false;
+  const commit = async () => {
+    const name = input.value.trim();
+    if (!name || committing) return;
+    committing = true;
+    setModalStatus(editModalStatus, `Looking up "${name}"…`, 'loading');
+    let rowData = { name, cost: '', rarity: 'common', art: null };
+    try {
+      const { cards, notFound } = await enrichCardsFromScryfall([{ name, count: 1 }]);
+      if (cards.length) {
+        rowData = { name: cards[0].name, cost: cards[0].cost, rarity: cards[0].rarity, art: cards[0].art };
+        setModalStatus(editModalStatus, '');
+      } else if (notFound.length) {
+        setModalStatus(editModalStatus, `"${name}" not found on Scryfall — fill in cost/rarity/art manually.`, 'error');
+      }
+    } catch (err) {
+      setModalStatus(editModalStatus, `Scryfall lookup failed: ${err.message} — fill in details manually.`, 'error');
+    }
+    _editRows.push({ rowId: ++_editRowSeq, type, count: 1, ...rowData });
+    committing = false;
+    renderEditCardTables();
+    scheduleCardPreview();
+  };
+
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
+  input.addEventListener('blur', commit);
+
+  return tr;
+}
+
+function renderEditCardTables() {
+  editCardTables.innerHTML = '';
+  for (const type of TYPE_ORDER) {
+    const rows = rowsForType(type);
+
+    const section = document.createElement('div');
+    section.className = 'edit-card-table-section';
+    const heading = document.createElement('div');
+    heading.className = 'edit-card-table-heading';
+    heading.textContent = type;
+    section.appendChild(heading);
+
+    const table = document.createElement('table');
+    table.className = 'edit-card-table';
+    const tbody = document.createElement('tbody');
+
+    if (!rows.length) {
+      const emptyRow = document.createElement('tr');
+      emptyRow.className = 'edit-card-empty-row';
+      const td = document.createElement('td');
+      td.colSpan = 6;
+      td.textContent = 'No cards';
+      emptyRow.appendChild(td);
+      tbody.appendChild(emptyRow);
+    }
+    for (const row of rows) tbody.appendChild(buildEditRowEl(row));
+    tbody.appendChild(buildAddCardRow(type));
+
+    // Fallback drop target for this type: dropping anywhere in the tbody that
+    // isn't on a specific row (including when it's empty) appends to the end.
+    tbody.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    tbody.addEventListener('drop', e => {
+      e.preventDefault();
+      const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
+      if (Number.isNaN(draggedId)) return;
+      moveEditRowToEndOfType(draggedId, type);
+      afterEditRowsReordered();
+    });
+
+    table.appendChild(tbody);
+    section.appendChild(table);
+    editCardTables.appendChild(section);
+  }
+}
+
+editAutoSort.addEventListener('change', () => {
+  if (editAutoSort.checked) {
+    resortAllEditRows();
+    renderEditCardTables();
+  }
+  scheduleCardPreview();
+});
+
 // ── LIVE CARD PREVIEW (full card, rendered from the modal's current values) ────
 // A sequence id cancels stale renders: rapid edits bump _cardPreviewSeq, and any
 // render whose captured id is no longer current discards its result.
@@ -650,14 +963,12 @@ async function buildPreviewModel() {
   if (!entry) return null;
   const styleKey = entry.styleKey ?? 'm15';
 
-  const parsed = parseManualDeck(editTextarea.value.trim());
-  if (!parsed.length) return null;
-  const deck = parsed[0];
+  const deck = buildDeckFromEditRows();
+  if (!deck.cards.length) return null;
 
   if (styleKey === 'cover') {
-    const subtitle  = editSubtitleInput.value.trim();
-    const baseTitle = splitTitleSubtitle(deck.name).title;
-    deck.name = mergeTitleSubtitle(baseTitle, subtitle);
+    const subtitle = editSubtitleInput.value.trim();
+    deck.name = mergeTitleSubtitle(deck.name, subtitle);
   }
 
   let artOverride = '';
@@ -672,6 +983,7 @@ async function buildPreviewModel() {
       colorOverride: editColorOverride,
       blendRatio: currentBlendRatio(),
       artTransform,
+      autoSort: editAutoSort.checked,
     }),
     styleKey,
   };
@@ -829,10 +1141,11 @@ editArtTransformReset.addEventListener('click', () => {
 });
 
 // Every editable input that feeds buildPreviewModel re-renders the preview:
-// deck text (incl. the title line), subtitle, and the art URL. Art-thumbnail
-// clicks (deck grid + Scryfall search) call scheduleCardPreview from their own
-// handlers in buildArtThumb. The watermark is not editable inside the modal.
-editTextarea.addEventListener('input', scheduleCardPreview);
+// title, subtitle, and the art URL (per-card table fields wire scheduleCardPreview
+// themselves in buildEditRowEl/buildAddCardRow). Art-thumbnail clicks (deck grid +
+// Scryfall search) call scheduleCardPreview from their own handlers in
+// buildArtThumb. The watermark is not editable inside the modal.
+editTitleInput.addEventListener('input', scheduleCardPreview);
 editSubtitleInput.addEventListener('input', scheduleCardPreview);
 
 // ── BLEND SLIDER ──────────────────────────────────────────────────────────────
@@ -879,32 +1192,22 @@ function seedBlendSlider() {
 }
 
 document.getElementById('editSaveBtn').addEventListener('click', async () => {
-  const text = editTextarea.value.trim();
-  if (!text || editingIndex < 0) return;
+  if (editingIndex < 0) return;
 
   setModalStatus(editModalStatus, '');
-  const parsed = parseManualDeck(text);
-  if (!parsed.length) { setModalStatus(editModalStatus, 'No cards found — check the format.', 'error'); return; }
+  const deck = buildDeckFromEditRows();
+  if (!deck.cards.length) { setModalStatus(editModalStatus, 'No cards — add at least one.', 'error'); return; }
 
-  const deck      = parsed[0];
   const entry     = getState(editingIndex);
   const styleKey  = entry?.styleKey ?? 'm15';
-
-  // ── Preserve per-card art (e.g. Cubecobra art_crop) ──
-  // parseManualDeck doesn't produce an `art` field, so carry it over from the
-  // previous deck by matching on card name. New cards just won't have art.
-  const artByName = new Map();
-  for (const c of entry?.deck?.cards ?? []) if (c.art) artByName.set(c.name, c.art);
-  for (const c of deck.cards) if (!c.art && artByName.has(c.name)) c.art = artByName.get(c.name);
 
   // Merge subtitle back into deck name (cover style only)
   if (styleKey === 'cover') {
     const subtitle = editSubtitleInput.value.trim();
-    const baseTitle = splitTitleSubtitle(deck.name).title;
-    deck.name = mergeTitleSubtitle(baseTitle, subtitle);
+    deck.name = mergeTitleSubtitle(deck.name, subtitle);
   }
 
-  const patch = { deck, colorOverride: editColorOverride };
+  const patch = { deck, colorOverride: editColorOverride, autoSort: editAutoSort.checked };
   if (MODAL_ART_STYLES.has(styleKey)) {
     patch.artOverride = editArtUrlInput.value.trim();
     patch.artTransform = { ..._workingTransform };
@@ -937,11 +1240,14 @@ function openEdit(index) {
   setModalStatus(editModalStatus, '');
   const styleKey = entry.styleKey ?? 'm15';
 
-  // Subtitle: cover only — extract from the "Title | Subtitle" deck name
+  // Title always shown; subtitle only for the cover style — both split out of
+  // the "Title | Subtitle" deck name.
+  const { title, subtitle } = splitTitleSubtitle(entry.deck.name);
+  editTitleInput.value = title;
   const isCover = styleKey === 'cover';
   editSubtitleGroup.style.display = isCover ? '' : 'none';
   if (isCover) {
-    editSubtitleInput.value = splitTitleSubtitle(entry.deck.name).subtitle;
+    editSubtitleInput.value = subtitle;
   }
 
   // Art URL + picker: art-bg and cover
@@ -996,9 +1302,12 @@ function openEdit(index) {
     }
   }
 
-  editTextarea.value = deckToManualText(entry.deck);
+  editAutoSort.checked = entry.autoSort !== false;
+  _editRows = buildEditRowsFromDeck(entry.deck, entry.autoSort);
+  renderEditCardTables();
+
   editModal.style.display = 'flex';
-  editTextarea.focus();
+  editTitleInput.focus();
   renderCardPreview();   // seed the live preview with the current card
 }
 

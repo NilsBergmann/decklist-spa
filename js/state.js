@@ -1,10 +1,12 @@
 // ── ACTIVE CARD STATE ────────────────────────────────────────────────────────
 // Replaces DOM-stashed state (downloadBtn._decks, cell._meta).
 // Each entry: { deck, wmKey, styleKey, artOverride, colorOverride, blendRatio,
-//               artTransform, model, cell }
+//               artTransform, autoSort, model, cell }
 //   colorOverride: null = auto; else WUBRG letters (or ['C']) for the pack colors.
 //   blendRatio:    null = auto (pip-count split); 0.5–0.9 = manual blend slider.
 //   artTransform:  { x, y, zoom } pan/zoom for the art box (default {0,0,1}).
+//   autoSort:      true (default) = each section auto-sorts by rarity/land-token
+//                  rule; false = the deck's own card order wins (edit-modal drag).
 
 const _entries = [];
 

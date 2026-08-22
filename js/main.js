@@ -12,10 +12,10 @@ import { getWatermarks, loadWatermarkSets } from './watermarks.js?v=6';
 import { createWatermarkCombobox } from './watermark-combobox.js?v=2';
 import {
   extractCubeId, fetchCubeData, parseDecks,
-  listCachedIds, parseManualDeck, parseDeckYaml,
+  listCachedIds, parseDeckYaml,
   parsePlainDecklist, enrichCardsFromScryfall,
-} from './cube-source.js?v=43';
-import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases, openBatchEdit, hasCards } from './cards-ui.js?v=66';
+} from './cube-source.js?v=44';
+import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases, openBatchEdit, hasCards } from './cards-ui.js?v=67';
 import { setStatus } from './status.js?v=1';
 
 // ── DOM REFERENCES ────────────────────────────────────────────────────────────

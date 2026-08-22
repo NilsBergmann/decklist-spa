@@ -4,7 +4,7 @@ import {
   WUBRG, RARITY_ORDER,
   IGNORED_TAGS_SET, IGNORED_TAG_RE,
 } from './config.js?v=3';
-import { groupByType, groupDuplicates, sortTypes } from './card-utils.js?v=4';
+import { groupByType, groupDuplicates, sortTypes } from './card-utils.js?v=5';
 
 // ── NORMALIZE RARITY ─────────────────────────────────────────────────────────
 
@@ -129,12 +129,12 @@ export function sanitizeParsedCost(parsedCost, cmc) {
 
 // Collapses type-bucket synonyms so cards land in one printed section
 // regardless of source (CubeCobra type line vs a manual-entry header):
-// Enchantment/Artifact → 'Artifacts & Enchantments', Instant/Sorcery →
+// Enchantment/Artifact/Battle → 'Artifacts & Enchantments', Instant/Sorcery →
 // 'Instants & Sorceries', Emblem → 'Token' (an emblem isn't cast and has no
 // rarity either — same non-card status as a token, so it gets the same
 // no-cost/no-bullet/alphabetical-sort treatment).
 function canonicalizeTypeBucket(base) {
-  if (base.includes('Enchantment') || base.includes('Artifact')) return 'Artifacts & Enchantments';
+  if (base.includes('Enchantment') || base.includes('Artifact') || base.includes('Battle')) return 'Artifacts & Enchantments';
   if (base.includes('Instant') || base.includes('Sorcery')) return 'Instants & Sorceries';
   if (base.includes('Emblem')) return 'Token';
   return base;
@@ -197,71 +197,14 @@ export function colorsFromCost(costRaw) {
   return colors.sort((a, b) => WUBRG.indexOf(a) - WUBRG.indexOf(b));
 }
 
-// ── MANUAL DECK PARSER ───────────────────────────────────────────────────────
-// Format:
-//   # Deck Name
-//   Creature
-//   4 Llanowar Elves {g}
-//   1 Wrath of God {2}{w}{w} (rare)
-//   Land
-//   6 Forest
-
-export function parseManualDeck(text) {
-  const decks = [];
-  let currentDeck = null;
-  let currentType = 'Other';
-
-  for (const rawLine of text.split('\n')) {
-    const line = rawLine.trim();
-    if (!line) continue;
-
-    if (line.startsWith('#')) {
-      const name = line.slice(1).trim() || 'Deck';
-      currentDeck = { name, cards: [] };
-      decks.push(currentDeck);
-      currentType = 'Other';
-      continue;
-    }
-
-    if (!currentDeck) {
-      currentDeck = { name: 'Manual Deck', cards: [] };
-      decks.push(currentDeck);
-    }
-
-    if (/^\d/.test(line)) {
-      const m = line.match(/^(\d+)\s+(.+?)(?:\s+((?:\{[^}]+\}\s*)+))?(?:\s*\(([^)]+)\))?\s*$/);
-      if (m) {
-        const count   = parseInt(m[1], 10);
-        const name    = m[2].trim();
-        const costRaw = (m[3] ?? '').trim();
-        const rarity  = normalizeRarity((m[4] ?? '').toLowerCase());
-
-        const colors = colorsFromCost(costRaw);
-
-        const cost = costRaw.replace(/\s+/g, '');
-
-        for (let i = 0; i < count; i++) {
-          currentDeck.cards.push({ name, type: currentType, rarity, cost, colors });
-        }
-      }
-      continue;
-    }
-
-    // Type header
-    currentType = canonicalizeTypeBucket(line.replace(/\s*\(\d+\)$/, '').trim());
-  }
-
-  return decks.filter(d => d.cards.length > 0);
-}
-
 // ── PLAIN/ARENA DECKLIST PARSER ──────────────────────────────────────────────
 // Format: MTG Arena export — "N Card Name (SET) NUM" or plain "Card Name"
 // (missing count defaults to 1, e.g. a list copied without quantities). Known
 // section header lines (Deck/Sideboard/Commander/…) and blank lines are
 // skipped, so a full Arena copy (which includes them even for a single-deck
 // export) folds into one deck — matching manual mode's "one paste = one deck"
-// model. Unlike parseManualDeck, this produces bare {name, count} pairs with
-// no cost/rarity/type — those are filled in by enrichCardsFromScryfall below.
+// model. This produces bare {name, count} pairs with no cost/rarity/type —
+// those are filled in by enrichCardsFromScryfall below.
 
 const SECTION_HEADER_LINES = new Set(['deck', 'sideboard', 'commander', 'companion', 'maybeboard']);
 
@@ -391,24 +334,6 @@ export async function enrichCardsFromScryfall(entries) {
   return { cards, notFound };
 }
 
-// ── DECK → MANUAL TEXT (for edit modal) ─────────────────────────────────────
-
-export function deckToManualText(deck) {
-  const lines = [`# ${deck.name}`];
-  const typeGroups = groupByType(deck.cards);
-  const sortedTypes = sortTypes(Object.keys(typeGroups));
-  for (const type of sortedTypes) {
-    if (type === 'Other') continue;
-    lines.push(type);
-    for (const { card, count } of groupDuplicates(typeGroups[type])) {
-      const cost   = card.cost ? ` ${card.cost}` : '';
-      const rarity = card.rarity !== 'common' ? ` (${card.rarity})` : '';
-      lines.push(`${count} ${card.name}${cost}${rarity}`);
-    }
-  }
-  return lines.join('\n');
-}
-
 // ── DECK YAML (D1: export / import) ─────────────────────────────────────────
 // A small, self-contained YAML subset — we own both ends, so no parser library.
 // Cards are stored compactly (count + fields); duplicates expand on import.
@@ -433,7 +358,7 @@ function yamlUnquote(v) {
 export function decksToYaml(entries) {
   const lines = ['# Decklist export', 'decks:'];
   for (const entry of entries) {
-    const { deck, wmKey, styleKey, artOverride, colorOverride, blendRatio, artTransform } = entry;
+    const { deck, wmKey, styleKey, artOverride, colorOverride, blendRatio, artTransform, autoSort } = entry;
     lines.push(`  - name: ${yamlQuote(deck.name)}`);
     if (wmKey)    lines.push(`    watermark: ${yamlQuote(wmKey)}`);
     if (styleKey) lines.push(`    style: ${yamlQuote(styleKey)}`);
@@ -445,11 +370,14 @@ export function decksToYaml(entries) {
     if (artTransform && (artTransform.x || artTransform.y || artTransform.zoom !== 1)) {
       lines.push(`    artTransform: ${yamlQuote(`${artTransform.x},${artTransform.y},${artTransform.zoom}`)}`);
     }
+    if (autoSort === false) lines.push(`    autoSort: "false"`);
     lines.push('    cards:');
     const typeGroups = groupByType(deck.cards);
+    // Manual order (autoSort === false) must round-trip as written — re-sorting
+    // by rarity on export would silently discard the very thing it's saving.
     for (const type of sortTypes(Object.keys(typeGroups))) {
       if (type === 'Other') continue;
-      for (const { card, count } of groupDuplicates(typeGroups[type])) {
+      for (const { card, count } of groupDuplicates(typeGroups[type], autoSort === false ? null : undefined)) {
         lines.push(`      - count: ${count}`);
         lines.push(`        name: ${yamlQuote(card.name)}`);
         lines.push(`        type: ${yamlQuote(card.type)}`);
@@ -507,7 +435,7 @@ export function parseDeckYaml(text) {
       decks.push(deck);
       deckSettings = {
         wmKey: null, styleKey: null, artOverride: null,
-        colorOverride: null, blendRatio: null, artTransform: null,
+        colorOverride: null, blendRatio: null, artTransform: null, autoSort: null,
       };
       settings.push(deckSettings);
       continue;
@@ -536,6 +464,7 @@ export function parseDeckYaml(text) {
         }
         continue;
       }
+      if (key === 'autosort') { deckSettings.autoSort = yamlUnquote(val) !== 'false'; continue; }
     }
 
     if (key === 'count') {

@@ -10,7 +10,7 @@ export function groupByType(cards) {
   return g;
 }
 
-function compareByRarity(a, b) {
+export function compareByRarity(a, b) {
   return RARITY_ORDER.indexOf(a.card.rarity) - RARITY_ORDER.indexOf(b.card.rarity);
 }
 
@@ -39,13 +39,17 @@ export function compareByCountThenName(a, b) {
   return b.count - a.count || a.card.name.localeCompare(b.card.name);
 }
 
+// compare === null (explicitly, not just omitted) skips sorting entirely and
+// preserves insertion order — used when a deck's manual card order should win
+// over the usual rarity/land/token sort (deck-model.js opts.autoSort).
 export function groupDuplicates(cards, compare = compareByRarity) {
   const map = {};
   for (const c of cards) {
     if (map[c.name]) map[c.name].count++;
     else map[c.name] = { card: c, count: 1 };
   }
-  return Object.values(map).sort(compare);
+  const rows = Object.values(map);
+  return compare ? rows.sort(compare) : rows;
 }
 
 // Sorts type names by TYPE_ORDER; unrecognized types (e.g. "Other") sort last.
