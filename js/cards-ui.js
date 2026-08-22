@@ -11,6 +11,7 @@ import { setStatus } from './status.js?v=1';
 import { createZipBlob } from './zip.js?v=1';
 import { groupByType, groupDuplicates, compareByRarity } from './card-utils.js?v=5';
 import { TYPE_ORDER, RARITY_ORDER } from './config.js?v=3';
+import { manaSrc, MANA_CODES } from './render/assets.js?v=1';
 import {
   clear as clearState, push as pushState,
   get as getState, update as updateState, getAll as getAllState,
@@ -655,6 +656,44 @@ function rowsForType(type) {
   return _editRows.filter(r => r.type === type);
 }
 
+// Rarity colors for this modal's dark UI — config.js's RARITY_HEX is tuned to
+// print on a light/cream card face (common = pure black), which would be
+// invisible against this modal's dark inputs, so these are lightened stand-ins
+// for the same four rarities rather than a reuse of RARITY_HEX.
+const EDIT_RARITY_COLOR = {
+  common: '#d0d0d0', uncommon: '#a9b0b6', rare: '#d9bd72', mythic: '#e2734c',
+};
+
+// Renders a {w}{u}-style cost string as mana-symbol icons into `container`
+// (the cost cell's clickable display button) — any token not in MANA_CODES
+// (e.g. a typo mid-edit) falls back to its own raw text instead of vanishing.
+function renderCostIcons(container, cost) {
+  container.innerHTML = '';
+  const tokens = (cost ?? '').match(/\{([^}]+)\}/g) ?? [];
+  if (!tokens.length) {
+    const empty = document.createElement('span');
+    empty.className = 'edit-card-cost-empty';
+    empty.textContent = '—';
+    container.appendChild(empty);
+    return;
+  }
+  for (const t of tokens) {
+    const code = t.slice(1, -1).toLowerCase().replace(/[-/]/g, '');
+    if (MANA_CODES.has(code)) {
+      const img = document.createElement('img');
+      img.className = 'mana-icon';
+      img.src = manaSrc(code);
+      img.alt = t;
+      container.appendChild(img);
+    } else {
+      const span = document.createElement('span');
+      span.className = 'edit-card-cost-unknown';
+      span.textContent = t;
+      container.appendChild(span);
+    }
+  }
+}
+
 // Seeds _editRows from a deck's flat card list, grouping duplicates into one
 // row per unique name (like the old manual-text format did). Sorted per
 // ROW_COMPARE_BY_TYPE/rarity when autoSort !== false; otherwise the deck's
@@ -803,21 +842,51 @@ function buildEditRowEl(row) {
   nameInput.setAttribute('aria-label', 'Card name');
   nameTd.appendChild(nameInput);
 
+  // Cost: renders as mana-symbol icons by default; clicking (or Enter/Space
+  // on the button) swaps in the raw {w}{u}-markup text input for editing.
   const costTd = document.createElement('td');
+  costTd.className = 'edit-card-cost-cell';
+
+  const costDisplay = document.createElement('button');
+  costDisplay.type = 'button';
+  costDisplay.className = 'edit-card-cost-display';
+  costDisplay.title = 'Click to edit mana cost';
+  costDisplay.setAttribute('aria-label', `Mana cost for ${row.name || 'this card'}, click to edit`);
+  renderCostIcons(costDisplay, row.cost);
+
   const costInput = document.createElement('input');
   costInput.type = 'text'; costInput.className = 'edit-card-cost';
   costInput.placeholder = '{2}{w}{w}';
   costInput.value = row.cost ?? '';
-  costInput.setAttribute('aria-label', 'Mana cost');
-  costTd.appendChild(costInput);
+  costInput.setAttribute('aria-label', 'Mana cost markup');
+  costInput.style.display = 'none';
+
+  let costBeforeEdit = row.cost ?? '';
+  const enterCostEdit = () => {
+    costBeforeEdit = row.cost ?? '';
+    costInput.value = costBeforeEdit;
+    costDisplay.style.display = 'none';
+    costInput.style.display = '';
+    costInput.focus();
+    costInput.select();
+  };
+  const exitCostEdit = () => {
+    costInput.style.display = 'none';
+    costDisplay.style.display = '';
+    renderCostIcons(costDisplay, row.cost);
+  };
+
+  costTd.append(costDisplay, costInput);
 
   const rarityTd = document.createElement('td');
   const raritySel = document.createElement('select');
   raritySel.className = 'edit-card-rarity';
   raritySel.setAttribute('aria-label', 'Rarity');
+  raritySel.style.color = EDIT_RARITY_COLOR[row.rarity] ?? '';
   for (const r of RARITY_ORDER) {
     const opt = document.createElement('option');
     opt.value = r; opt.textContent = r[0].toUpperCase() + r.slice(1);
+    opt.style.color = EDIT_RARITY_COLOR[r] ?? '';
     if (r === row.rarity) opt.selected = true;
     raritySel.appendChild(opt);
   }
@@ -837,8 +906,25 @@ function buildEditRowEl(row) {
     scheduleCardPreview();
   });
   nameInput.addEventListener('input', () => { row.name = nameInput.value; scheduleCardPreview(); });
+
+  costDisplay.addEventListener('click', enterCostEdit);
   costInput.addEventListener('input', () => { row.cost = costInput.value; scheduleCardPreview(); });
-  raritySel.addEventListener('change', () => { row.rarity = raritySel.value; scheduleCardPreview(); });
+  costInput.addEventListener('blur', exitCostEdit);
+  costInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); exitCostEdit(); }
+    else if (e.key === 'Escape') {
+      e.preventDefault();
+      row.cost = costBeforeEdit;
+      exitCostEdit();
+      scheduleCardPreview();
+    }
+  });
+
+  raritySel.addEventListener('change', () => {
+    row.rarity = raritySel.value;
+    raritySel.style.color = EDIT_RARITY_COLOR[row.rarity] ?? '';
+    scheduleCardPreview();
+  });
   removeBtn.addEventListener('click', () => {
     _editRows = _editRows.filter(r => r.rowId !== row.rowId);
     renderEditCardTables();

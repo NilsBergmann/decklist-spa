@@ -643,12 +643,46 @@ button.danger:active         { background: #b91c1c; }
 .edit-card-count  { width: 44px; text-align: center; }
 .edit-card-name   { width: 100%; min-width: 120px; }
 .edit-card-cost   { width: 90px; font-family: 'Courier New', Courier, monospace; }
-.edit-card-rarity { width: auto; }
+.edit-card-rarity { width: auto; background-color: #2d2d2d; }
 .edit-card-table input[type="text"],
 .edit-card-table input[type="number"],
 .edit-card-table select {
   padding: 5px 7px;
   font-size: 12.5px;
+}
+
+/* Cost cell: mana-icon display by default, swaps to the raw {w}{u} text input on click */
+.edit-card-cost-cell { min-width: 84px; }
+.edit-card-cost-display {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 24px;
+  width: 100%;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+}
+.edit-card-cost-display:hover, .edit-card-cost-display:focus {
+  border-color: #4a4a4a;
+  background: #2a2a2a;
+  outline: none;
+}
+.edit-card-cost-display .mana-icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.edit-card-cost-empty {
+  color: #666;
+  font-size: 12px;
+}
+.edit-card-cost-unknown {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  color: #ccc;
 }
 
 .edit-card-remove {
