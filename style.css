@@ -115,6 +115,16 @@ label {
   margin-bottom: 5px;
 }
 
+.field-hint {
+  font-size: 11px;
+  color: #777;
+  margin-bottom: 6px;
+}
+
+.field-hint a {
+  color: #7db4ff;
+}
+
 input[type="text"],
 select,
 textarea {

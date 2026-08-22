@@ -13,8 +13,9 @@ import { createWatermarkCombobox } from './watermark-combobox.js?v=2';
 import {
   extractCubeId, fetchCubeData, parseDecks,
   listCachedIds, parseManualDeck, parseDeckYaml,
-} from './cube-source.js?v=40';
-import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases, openBatchEdit, hasCards } from './cards-ui.js?v=63';
+  parsePlainDecklist, enrichCardsFromScryfall,
+} from './cube-source.js?v=43';
+import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases, openBatchEdit, hasCards } from './cards-ui.js?v=66';
 import { setStatus } from './status.js?v=1';
 
 // ── DOM REFERENCES ────────────────────────────────────────────────────────────
@@ -221,12 +222,35 @@ generateBtn.addEventListener('click', async () => {
   setStatus('');
 
   let decks;
+  let notFoundWarning = '';
 
   if (mode === 'manual') {
     const text = document.getElementById('manualText').value.trim();
     if (!text) { setStatus('Enter a deck list in the text area.', 'error'); return; }
-    decks = parseManualDeck(text);
-    if (!decks.length) { setStatus('No cards found — check the format.', 'error'); return; }
+    const deckName = document.getElementById('manualDeckName').value.trim() || 'Deck';
+
+    const entries = parsePlainDecklist(text);
+    if (!entries.length) { setStatus('No cards found — check the format.', 'error'); return; }
+
+    generateBtn.disabled = true;
+    setStatus(`Looking up ${entries.length} card${entries.length !== 1 ? 's' : ''} on Scryfall…`, 'loading');
+    let cards, notFound;
+    try {
+      ({ cards, notFound } = await enrichCardsFromScryfall(entries));
+    } catch (err) {
+      setStatus(`Error: ${err.message}`, 'error');
+      generateBtn.disabled = false;
+      return;
+    }
+    if (!cards.length) {
+      setStatus('No matching cards found on Scryfall — check the card names.', 'error');
+      generateBtn.disabled = false;
+      return;
+    }
+    decks = [{ name: deckName, cards }];
+    if (notFound.length) {
+      notFoundWarning = ` Not found on Scryfall: ${notFound.join(', ')}.`;
+    }
   } else {
     const cubeId = extractCubeId(document.getElementById('cubeId').value.trim());
     if (!cubeId) { setStatus('Enter a Cube ID or slug.', 'error'); return; }
@@ -254,7 +278,7 @@ generateBtn.addEventListener('click', async () => {
 
   try {
     await renderDecks(decks, wmKey, styleKey, artOverride);
-    setStatus(`${decks.length} deck card${decks.length !== 1 ? 's' : ''} generated.`);
+    setStatus(`${decks.length} deck card${decks.length !== 1 ? 's' : ''} generated.${notFoundWarning}`, notFoundWarning ? 'error' : '');
     printBtn.style.display      = '';
     downloadBtn.style.display   = '';
     batchEditBtn.style.display  = '';

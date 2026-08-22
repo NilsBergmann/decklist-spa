@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Decklist Generator</title>
-  <link rel="stylesheet" href="style.css?v=1">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
   <div id="controls">
@@ -20,6 +20,7 @@
     <div id="modeCubecobra" class="mode-panel">
       <div class="form-group">
         <label for="cubeId">Cube ID, slug, or URL</label>
+        <div class="field-hint">Each Cubecobra tag becomes one printed card — tag every card in an archetype/precon with the same tag name so they group together. Reference cube built this way: <a href="https://cubecobra.com/cube/list/tla-tle-tight" target="_blank" rel="noopener">tla-tle-tight</a>.</div>
         <input id="cubeId" type="text" placeholder="eb930417-548a-4265-82c9-e661e6dfe87f" />
       </div>
       <div class="form-group" id="cacheGroup" style="display:none">
@@ -35,8 +36,13 @@
     <!-- B2: Manual mode -->
     <div id="modeManual" class="mode-panel" style="display:none">
       <div class="form-group">
+        <label for="manualDeckName">Deck name</label>
+        <input id="manualDeckName" type="text" placeholder="Deck" />
+      </div>
+      <div class="form-group">
         <label for="manualText">Deck list</label>
-        <textarea id="manualText" placeholder="# Deck Name&#10;Creature&#10;4 Llanowar Elves {g}&#10;1 Wrath of God {2}{w}{w} (rare)&#10;Land&#10;6 Forest"></textarea>
+        <div class="field-hint">Paste an Arena-format list (count + card name, count optional — defaults to 1) — cost, rarity, and art are looked up automatically.</div>
+        <textarea id="manualText" placeholder="4 Llanowar Elves (DOM) 180&#10;1 Wrath of God (M19) 15&#10;6 Forest"></textarea>
       </div>
     </div>
 
@@ -206,6 +212,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/main.js?v=90"></script>
+  <script type="module" src="js/main.js?v=93"></script>
 </body>
 </html>

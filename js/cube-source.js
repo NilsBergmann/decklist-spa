@@ -254,6 +254,143 @@ export function parseManualDeck(text) {
   return decks.filter(d => d.cards.length > 0);
 }
 
+// ── PLAIN/ARENA DECKLIST PARSER ──────────────────────────────────────────────
+// Format: MTG Arena export — "N Card Name (SET) NUM" or plain "Card Name"
+// (missing count defaults to 1, e.g. a list copied without quantities). Known
+// section header lines (Deck/Sideboard/Commander/…) and blank lines are
+// skipped, so a full Arena copy (which includes them even for a single-deck
+// export) folds into one deck — matching manual mode's "one paste = one deck"
+// model. Unlike parseManualDeck, this produces bare {name, count} pairs with
+// no cost/rarity/type — those are filled in by enrichCardsFromScryfall below.
+
+const SECTION_HEADER_LINES = new Set(['deck', 'sideboard', 'commander', 'companion', 'maybeboard']);
+
+const PLAIN_LINE_RE = /^(?:(\d+)\s+)?(.+?)(?:\s+\([A-Za-z0-9]+\)\s+[A-Za-z0-9-★]+)?\s*$/;
+
+export function parsePlainDecklist(text) {
+  const cards = [];
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || SECTION_HEADER_LINES.has(line.toLowerCase())) continue;
+    const m = line.match(PLAIN_LINE_RE);
+    if (!m) continue;
+    const count = m[1] ? parseInt(m[1], 10) : 1;
+    const name  = m[2].trim();
+    if (count > 0 && name) cards.push({ name, count });
+  }
+  return cards;
+}
+
+// ── SCRYFALL CARD-DATA CACHE (7-day TTL) ─────────────────────────────────────
+// Card data (cost/rarity/type/art) barely changes — a much longer TTL than
+// the 24h cube cache above is fine, and keeps repeated Generates (iterating
+// on watermark/style) from re-hitting the network for names already resolved.
+
+const SCRYFALL_CARD_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function scryfallCardCacheGet(nameKey) {
+  try {
+    const raw = localStorage.getItem(`scryfall-card:${nameKey}`);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts > SCRYFALL_CARD_CACHE_TTL_MS) { localStorage.removeItem(`scryfall-card:${nameKey}`); return null; }
+    return data;
+  } catch { return null; }
+}
+
+function scryfallCardCacheSet(nameKey, data) {
+  try { localStorage.setItem(`scryfall-card:${nameKey}`, JSON.stringify({ ts: Date.now(), data })); } catch {}
+}
+
+// ── SCRYFALL BATCH ENRICHMENT (plain decklist → full card objects) ─────────
+// Looks up cost/rarity/type/colors/art for {name, count} entries via
+// Scryfall's collection endpoint (POST, up to 75 identifiers per call). Maps
+// each match to the exact card shape parseDecks() already produces from
+// Cubecobra data, so deck-model.js needs no changes regardless of source.
+
+const SCRYFALL_COLLECTION_URL = 'https://api.scryfall.com/cards/collection';
+const SCRYFALL_BATCH_SIZE = 75;
+
+// DFCs/modal cards can leave the top-level mana_cost/colors blank (and
+// type_line combined as "Face A // Face B") — fall back to the front face.
+function frontFaceFields(card) {
+  const face = card.card_faces?.[0];
+  const combinedTypeLine = card.type_line?.includes(' // ');
+  return {
+    manaCost: card.mana_cost || face?.mana_cost || '',
+    typeLine: (combinedTypeLine && face?.type_line) ? face.type_line : (card.type_line || face?.type_line || ''),
+    colors:   card.colors ?? face?.colors ?? [],
+    art:      card.image_uris?.art_crop ?? face?.image_uris?.art_crop ?? null,
+  };
+}
+
+function scryfallCardToEntry(name, card) {
+  const { manaCost, typeLine, colors, art } = frontFaceFields(card);
+  return {
+    name,
+    rarity: normalizeRarity(card.rarity),
+    type:   simplifyType(typeLine),
+    cost:   manaCost,
+    colors,
+    art,
+  };
+}
+
+// entries: [{ name, count }] (duplicate names are merged/summed). Returns
+// { cards, notFound } — cards already expanded to `count` individual
+// entries; notFound lists names Scryfall couldn't match so the caller can
+// warn about them without losing the rest of the deck.
+export async function enrichCardsFromScryfall(entries) {
+  const byName = new Map();   // lowercased name -> { name, count } (first-seen casing)
+  for (const e of entries) {
+    const key = e.name.toLowerCase();
+    const existing = byName.get(key);
+    if (existing) existing.count += e.count;
+    else byName.set(key, { ...e });
+  }
+
+  const resolved = new Map();   // lowercased name -> scryfall card object
+  const toFetch = [];
+  for (const [key, e] of byName) {
+    const cached = scryfallCardCacheGet(key);
+    if (cached) resolved.set(key, cached);
+    else toFetch.push(e.name);
+  }
+
+  for (let i = 0; i < toFetch.length; i += SCRYFALL_BATCH_SIZE) {
+    const batch = toFetch.slice(i, i + SCRYFALL_BATCH_SIZE);
+    const res = await fetch(SCRYFALL_COLLECTION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifiers: batch.map(name => ({ name })) }),
+    });
+    if (!res.ok) throw new Error(`Scryfall returned HTTP ${res.status}`);
+    const data = await res.json();
+    for (const card of data.data ?? []) {
+      // Modal DFCs return a combined "Face A // Face B" top-level name, which
+      // won't match the single-face name actually requested (e.g. "Valki,
+      // God of Lies") — match against every face name too, falling back to
+      // the combined name only if nothing in this batch asked for either.
+      const candidateKeys = [card.name, ...(card.card_faces?.map(f => f.name) ?? [])]
+        .map(n => n.toLowerCase());
+      const key = candidateKeys.find(k => byName.has(k)) ?? card.name.toLowerCase();
+      resolved.set(key, card);
+      scryfallCardCacheSet(key, card);
+    }
+    // Unmatched identifiers (data.not_found) just stay unresolved — surfaced below.
+  }
+
+  const cards = [];
+  const notFound = [];
+  for (const [key, e] of byName) {
+    const card = resolved.get(key);
+    if (!card) { notFound.push(e.name); continue; }
+    const entry = scryfallCardToEntry(card.name, card);
+    for (let i = 0; i < e.count; i++) cards.push({ ...entry });
+  }
+  return { cards, notFound };
+}
+
 // ── DECK → MANUAL TEXT (for edit modal) ─────────────────────────────────────
 
 export function deckToManualText(deck) {
