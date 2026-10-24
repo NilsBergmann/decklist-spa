@@ -70,8 +70,8 @@ export async function fetchCubeData(cubeId) {
 
 // ── MANA SYMBOL HELPERS ──────────────────────────────────────────────────────
 
-// Sort key: X/Y/Z → generic numbers → 2/color hybrid → two-color hybrid →
-// phyrexian → mono-colored WUBRG → colorless
+// Sort key: X/Y/Z → generic numbers → 2/color hybrid → two-color/colorless
+// hybrid → phyrexian → mono-colored WUBRG → colorless
 export function manaSortKey(sym) {
   const s = sym.toLowerCase().replace(/-/g, '');
   if (s === 'x') return 0;
@@ -79,8 +79,8 @@ export function manaSortKey(sym) {
   if (s === 'z') return 2;
   if (/^\d+$/.test(s)) return 10 + parseInt(s, 10);   // generic: 0–20 → 10–30
   if (/^\d[wubrg]$/.test(s)) return 40;               // 2/color hybrid
-  if (/^[wubrg]{2}$/.test(s)) return 45;              // two-color hybrid
-  if (/^[wubrgc]p$/.test(s)) return 55;               // phyrexian
+  if (/^[wubrgc]{2}$/.test(s)) return 45;             // two-color/colorless hybrid, e.g. {W/U}, {C/W}
+  if (/^[wubrgc]p$/.test(s)) return 55;               // phyrexian, e.g. {W/P}, {C/P}
   const colorOrder = { w: 60, u: 61, b: 62, r: 63, g: 64, c: 65, s: 66 };
   return colorOrder[s] ?? 99;
 }
@@ -93,11 +93,17 @@ export function formatCost(parsedCost) {
     .join('');
 }
 
-// Recognizes every symbol shape manaSortKey/manaValue know how to handle.
-// Cubecobra's parsed_cost sometimes injects non-symbol tokens (see below) —
-// those must be dropped outright rather than falling through to a fallback
-// weight/sort position, or they leak into the rendered cost as literal text.
-const VALID_SYMBOL_RE = /^(x|y|z|\d+|\d[wubrg]|[wubrg]{2}|[wubrgc]p|[wubrgcs])$/;
+// Recognizes every symbol shape manaSortKey/manaValue know how to handle,
+// including colorless hybrid ({C/W}..{C/G}, e.g. Ulalek, Fused Atrocity) and
+// colorless Phyrexian ({C/P}) alongside the more common two-color hybrid and
+// mono-colored Phyrexian symbols — even where no icon asset exists yet for
+// one of these (MANA_CODES/cards-ui.js render it as literal bracketed text
+// in that case), the symbol itself must never be treated as a bogus token.
+// Cubecobra's parsed_cost sometimes injects actual non-symbol tokens (see
+// below) — those must be dropped outright rather than falling through to a
+// fallback weight/sort position, or they leak into the rendered cost as
+// literal text.
+const VALID_SYMBOL_RE = /^(x|y|z|\d+|\d[wubrg]|[wubrgc]{2}|[wubrgc]p|[wubrgcs])$/;
 
 function isValidSymbol(sym) {
   return VALID_SYMBOL_RE.test(String(sym).toLowerCase().replace(/-/g, ''));

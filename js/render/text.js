@@ -153,8 +153,13 @@ function buildParagraphSpans(ctx, tokens, { fontFamily, fontSize, baseFontSize, 
       if (MANA_CODES.has(code)) {
         const sz = Math.round(fontSize * 0.78);
         spans.push({ type: 'mana', code, size: sz, width: sz, x: indentX, gap: Math.round(fontSize * 0.05) });
-        indentX = null;
+      } else {
+        // A real mana symbol shape with no icon asset yet (e.g. the rare
+        // colorless-hybrid {C/W} or colorless-Phyrexian {C/P} costs) — show
+        // the raw bracketed text instead of silently dropping the symbol.
+        spans.push({ type: 'text', text: `{${t}}`, bold, color, fontFamily, size: Math.round(fontSize * sizeScale), x: indentX, width: 0 });
       }
+      indentX = null;
       continue;
     }
     if (!tok.value) continue;
