@@ -17,6 +17,8 @@ import {
 } from './cube-source.js?v=44';
 import { renderDecks, downloadAll, downloadDecksYaml, rerenderAll, materializePrintCanvases, openBatchEdit, hasCards } from './cards-ui.js?v=68';
 import { setStatus } from './status.js?v=1';
+import { setChangeListener } from './state.js?v=3';
+import { scheduleSessionSave, loadSession, clearSession } from './session.js?v=1';
 
 // ── DOM REFERENCES ────────────────────────────────────────────────────────────
 
@@ -30,6 +32,11 @@ const importYamlInput = document.getElementById('importYamlInput');
 const cacheSelect    = document.getElementById('cacheSelect');
 const cacheLoadBtn   = document.getElementById('cacheLoadBtn');
 const cacheDeleteBtn = document.getElementById('cacheDeleteBtn');
+
+// Auto-save the full working session (every generated deck + its per-deck
+// overrides) on every state.js mutation, debounced — see js/session.js.
+// Restoring is never automatic; see the banner wiring further down.
+setChangeListener(scheduleSessionSave);
 
 // ── SETTINGS PERSISTENCE ──────────────────────────────────────────────────────
 // Remember the user's style / watermark / page-size / crop-marks choices across
@@ -205,6 +212,64 @@ cropMarksEl.addEventListener('change', () => {
   applyPageSettings();
 })();
 
+// ── SESSION AUTO-SAVE: RESTORE PROMPT ───────────────────────────────────────
+// A previous session (every generated deck + its per-deck overrides) may be
+// sitting in localStorage from before a reload/crash/accidental tab close —
+// offer to bring it back, but never apply it silently (it could stomp on
+// whatever the user is about to paste in instead).
+
+const restoreBanner = document.getElementById('sessionRestoreBanner');
+const restoreText    = document.getElementById('sessionRestoreText');
+const restoreBtn     = document.getElementById('sessionRestoreBtn');
+const discardBtn     = document.getElementById('sessionDiscardBtn');
+
+function hideRestoreBanner() { restoreBanner.style.display = 'none'; }
+
+function timeAgo(ms) {
+  const mins = Math.round((Date.now() - ms) / 60000);
+  if (mins < 1)  return 'just now';
+  if (mins === 1) return '1 minute ago';
+  if (mins < 60) return `${mins} minutes ago`;
+  const hours = Math.round(mins / 60);
+  return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+}
+
+function showCardControls() {
+  printBtn.style.display      = '';
+  downloadBtn.style.display   = '';
+  batchEditBtn.style.display  = '';
+  exportYamlBtn.style.display = '';
+}
+
+(function offerSessionRestore() {
+  const session = loadSession();
+  if (!session) return;
+  const n = session.entries.length;
+  restoreText.textContent =
+    `Restore your previous session? (${n} deck card${n !== 1 ? 's' : ''}, saved ${timeAgo(session.savedAt)})`;
+  restoreBanner.style.display = '';
+
+  restoreBtn.addEventListener('click', async () => {
+    hideRestoreBanner();
+    const decks = session.entries.map(e => e.deck);
+    applyPageSettings();
+    setStatus(`Rendering ${decks.length} card${decks.length !== 1 ? 's' : ''}…`, 'loading');
+    try {
+      await renderDecks(decks, wmSelect.value, styleSelect.value,
+                        document.getElementById('artUrl').value.trim(), session.entries);
+      setStatus(`${decks.length} deck card${decks.length !== 1 ? 's' : ''} restored.`);
+      showCardControls();
+    } catch (err) {
+      setStatus(`Error: ${err.message}`, 'error');
+    }
+  });
+
+  discardBtn.addEventListener('click', () => {
+    clearSession();
+    hideRestoreBanner();
+  });
+})();
+
 // ── GENERATE ──────────────────────────────────────────────────────────────────
 
 generateBtn.addEventListener('click', async () => {
@@ -214,6 +279,7 @@ generateBtn.addEventListener('click', async () => {
   const artOverride = document.getElementById('artUrl').value.trim();
 
   applyPageSettings();
+  hideRestoreBanner();
 
   printBtn.style.display      = 'none';
   downloadBtn.style.display   = 'none';
@@ -279,10 +345,7 @@ generateBtn.addEventListener('click', async () => {
   try {
     await renderDecks(decks, wmKey, styleKey, artOverride);
     setStatus(`${decks.length} deck card${decks.length !== 1 ? 's' : ''} generated.${notFoundWarning}`, notFoundWarning ? 'error' : '');
-    printBtn.style.display      = '';
-    downloadBtn.style.display   = '';
-    batchEditBtn.style.display  = '';
-    exportYamlBtn.style.display = '';
+    showCardControls();
   } catch (err) {
     setStatus(`Error: ${err.message}`, 'error');
   } finally {
@@ -330,6 +393,7 @@ importYamlInput.addEventListener('change', async () => {
   if (!decks.length) { setStatus('No decks found in that YAML file.', 'error'); return; }
 
   applyPageSettings();
+  hideRestoreBanner();
   setStatus(`Rendering ${decks.length} card${decks.length !== 1 ? 's' : ''}…`, 'loading');
   try {
     // Per-deck settings from the YAML (watermark/style/art/etc.) win; any deck
@@ -337,10 +401,7 @@ importYamlInput.addEventListener('change', async () => {
     await renderDecks(decks, wmSelect.value, styleSelect.value,
                       document.getElementById('artUrl').value.trim(), settings);
     setStatus(`${decks.length} deck card${decks.length !== 1 ? 's' : ''} imported.`);
-    printBtn.style.display      = '';
-    downloadBtn.style.display   = '';
-    batchEditBtn.style.display  = '';
-    exportYamlBtn.style.display = '';
+    showCardControls();
   } catch (err) {
     setStatus(`Error: ${err.message}`, 'error');
   }

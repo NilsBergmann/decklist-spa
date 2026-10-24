@@ -16,7 +16,7 @@ import {
   clear as clearState, push as pushState,
   get as getState, update as updateState, getAll as getAllState,
   move as moveState, indexOfCell,
-} from './state.js?v=2';
+} from './state.js?v=3';
 
 // ── DISPLAY CANVAS DIMENSIONS (screen resolution) ────────────────────────────
 

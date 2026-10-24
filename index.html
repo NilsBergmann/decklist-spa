@@ -4,11 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Decklist Generator</title>
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <div id="controls">
     <h1>Decklist Generator</h1>
+
+    <!-- Session auto-save restore prompt (see js/session.js) -->
+    <div id="sessionRestoreBanner" class="session-banner" style="display:none" role="status" aria-live="polite">
+      <span id="sessionRestoreText"></span>
+      <button id="sessionRestoreBtn" class="secondary">Restore</button>
+      <button id="sessionDiscardBtn" class="secondary">Discard</button>
+    </div>
 
     <!-- B2: Input-mode tabs -->
     <div class="tabs">

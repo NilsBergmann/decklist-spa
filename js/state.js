@@ -10,14 +10,21 @@
 
 const _entries = [];
 
-export function clear() { _entries.length = 0; }
+// Fires after every mutation below (clear/push/update/move) — session.js uses
+// this to debounce an auto-save, without every call site here needing to
+// remember to trigger one itself.
+let _onChange = null;
+export function setChangeListener(fn) { _onChange = fn; }
+function notify() { if (_onChange) _onChange(); }
 
-export function push(entry) { _entries.push(entry); }
+export function clear() { _entries.length = 0; notify(); }
+
+export function push(entry) { _entries.push(entry); notify(); }
 
 export function get(index) { return _entries[index] ?? null; }
 
 export function update(index, patch) {
-  if (_entries[index]) Object.assign(_entries[index], patch);
+  if (_entries[index]) { Object.assign(_entries[index], patch); notify(); }
 }
 
 export function getAll() { return _entries; }
@@ -28,6 +35,7 @@ export function move(from, to) {
       from >= _entries.length || to >= _entries.length) return;
   const [moved] = _entries.splice(from, 1);
   _entries.splice(to, 0, moved);
+  notify();
 }
 
 // Current index of a cell's entry (handlers resolve this live so positional

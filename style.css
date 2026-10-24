@@ -292,6 +292,23 @@ button.danger:active         { background: #b91c1c; }
   flex: 1;
 }
 
+/* ── SESSION RESTORE BANNER ─────────────────────────────── */
+
+.session-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: #1e3a5f;
+  border: 1px solid #2d5a8f;
+  font-size: 13px;
+}
+.session-banner span { flex: 1 1 auto; }
+.session-banner button { padding: 6px 14px; font-size: 13px; }
+
 /* ── STATUS ─────────────────────────────────────────────── */
 
 #status {
