@@ -11,7 +11,7 @@ export const CC_W = 2010;
 export const CC_H = 2814;
 
 const COLOR_TO_FRAME = {
-  W: 'w', U: 'u', B: 'b', R: 'r', G: 'g', M: 'm', C: 'l',
+  W: 'w', U: 'u', B: 'b', R: 'r', G: 'g', M: 'm', C: 'a',
 };
 
 export const WATERMARK_BOUNDS  = { x: 0.5, y: 0.516, width: 0.75, height: 0.4562 };
@@ -21,7 +21,7 @@ export const WATERMARK_OPACITY = 0.2;
 const SPLIT_BAND = 0.06;
 
 export function frameSrc(color) {
-  return `assets/frames/m15/fullTextAlt/${COLOR_TO_FRAME[color] || 'l'}.png`;
+  return `assets/frames/m15/fullTextAlt/${COLOR_TO_FRAME[color] || 'a'}.png`;
 }
 
 export async function drawFrames(ctx, w, h, model) {
