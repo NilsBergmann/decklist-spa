@@ -81,7 +81,7 @@ export function manaSortKey(sym) {
   if (/^\d[wubrg]$/.test(s)) return 40;               // 2/color hybrid
   if (/^[wubrg]{2}$/.test(s)) return 45;              // two-color hybrid
   if (/^[wubrgc]p$/.test(s)) return 55;               // phyrexian
-  const colorOrder = { w: 60, u: 61, b: 62, r: 63, g: 64, c: 65 };
+  const colorOrder = { w: 60, u: 61, b: 62, r: 63, g: 64, c: 65, s: 66 };
   return colorOrder[s] ?? 99;
 }
 
@@ -91,6 +91,16 @@ export function formatCost(parsedCost) {
     .sort((a, b) => manaSortKey(a) - manaSortKey(b))
     .map(c => `{${c.replace(/-/g, '')}}`)
     .join('');
+}
+
+// Recognizes every symbol shape manaSortKey/manaValue know how to handle.
+// Cubecobra's parsed_cost sometimes injects non-symbol tokens (see below) —
+// those must be dropped outright rather than falling through to a fallback
+// weight/sort position, or they leak into the rendered cost as literal text.
+const VALID_SYMBOL_RE = /^(x|y|z|\d+|\d[wubrg]|[wubrg]{2}|[wubrgc]p|[wubrgcs])$/;
+
+function isValidSymbol(sym) {
+  return VALID_SYMBOL_RE.test(String(sym).toLowerCase().replace(/-/g, ''));
 }
 
 // Mana value contributed by a single symbol, per the standard CMC rules:
@@ -105,21 +115,43 @@ function manaValue(sym) {
 }
 
 // Cubecobra's parsed_cost occasionally concatenates BOTH faces of a multi-part
-// card (seen on brand-new layouts, e.g. "prepare" cards, that its indexer
-// hasn't special-cased yet) instead of just the front face — e.g. Abigale,
-// Poet Laureate // Heroic Stanza ({1}{W}{B} // {1}{W/B}) comes back as
-// ["1","w","b","1","wb"] although its own cmc is 3, not 5.
-// A single real face's symbols always sum to the card's cmc, so if the raw
-// array overshoots that total, keep only the shortest leading prefix whose
-// value reaches it and drop the leaked remainder.
+// card (seen on brand-new layouts, e.g. "prepare"/split cards, that its
+// indexer hasn't special-cased yet) instead of just the front face — e.g.
+// Abigale, Poet Laureate // Heroic Stanza ({1}{W}{B} // {1}{W/B}) comes back
+// as ["1","w","b","1","wb"] although its own cmc is 3, not 5 — the leaked
+// second face is appended AFTER the real front face. It can also inject the
+// literal string "split" as a bogus array element and put the leaked face
+// BEFORE the real one instead (e.g. Hallway Heckler // Vicious Verse's
+// {B/R} back face parses as ["b-r","split","r","2"] though its cmc is 3, not
+// 4) — the leak side isn't consistent, so "split" (never a real symbol) is
+// filtered out first, then both a leading prefix and a trailing suffix are
+// tried for an exact value match to the card's cmc, since the real face is
+// always a contiguous run from one end or the other.
 export function sanitizeParsedCost(parsedCost, cmc) {
   if (!Array.isArray(parsedCost) || typeof cmc !== 'number') return parsedCost;
-  const total = parsedCost.reduce((sum, sym) => sum + manaValue(sym), 0);
-  if (total <= cmc) return parsedCost;
+  const symbols = parsedCost.filter(isValidSymbol);
+  const total = symbols.reduce((sum, sym) => sum + manaValue(sym), 0);
+  if (total <= cmc) return symbols;
 
-  const kept = [];
   let running = 0;
-  for (const sym of parsedCost) {
+  for (let i = 0; i < symbols.length; i++) {
+    running += manaValue(symbols[i]);
+    if (running === cmc) return symbols.slice(0, i + 1);
+    if (running > cmc) break;
+  }
+
+  running = 0;
+  for (let i = symbols.length - 1; i >= 0; i--) {
+    running += manaValue(symbols[i]);
+    if (running === cmc) return symbols.slice(i);
+    if (running > cmc) break;
+  }
+
+  // No exact match either way (e.g. an X cost throws the running total off) —
+  // fall back to the shortest leading prefix that reaches the cmc.
+  const kept = [];
+  running = 0;
+  for (const sym of symbols) {
     if (running >= cmc) break;
     kept.push(sym);
     running += manaValue(sym);
@@ -259,8 +291,9 @@ const SCRYFALL_BATCH_SIZE = 75;
 function frontFaceFields(card) {
   const face = card.card_faces?.[0];
   const combinedTypeLine = card.type_line?.includes(' // ');
+  const combinedManaCost = card.mana_cost?.includes(' // ');
   return {
-    manaCost: card.mana_cost || face?.mana_cost || '',
+    manaCost: (combinedManaCost && face?.mana_cost) ? face.mana_cost : (card.mana_cost || face?.mana_cost || ''),
     typeLine: (combinedTypeLine && face?.type_line) ? face.type_line : (card.type_line || face?.type_line || ''),
     colors:   card.colors ?? face?.colors ?? [],
     art:      card.image_uris?.art_crop ?? face?.image_uris?.art_crop ?? null,
