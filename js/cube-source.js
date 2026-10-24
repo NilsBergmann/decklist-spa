@@ -183,6 +183,12 @@ export function simplifyType(typeStr) {
   const base = typeStr.split(' — ')[0].replace(/^Legendary /, '').replace(/^Basic /, '');
   if (base === 'Card') return 'Other';
   if (base.includes('Token')) return 'Token';
+  // Land wins over every other type it's combined with (Artifact Land e.g.
+  // Darksteel Citadel, Enchantment Land e.g. Urza's Saga, Land Creature e.g.
+  // Dryad Arbor) — it prints in the Land section either way, so it must be
+  // checked before Creature and before canonicalizeTypeBucket's Artifact/
+  // Enchantment bucketing, not fall through to them.
+  if (base.includes('Land')) return 'Land';
   if (base.includes('Creature')) return 'Creature';
   return canonicalizeTypeBucket(base);
 }
